@@ -1,0 +1,176 @@
+// Browser seam for foldable panels: the markup is a native <details> (src/templates/panel.js), so this file checks the three
+// things only a browser can show — that a reader's click folds and unfolds a panel and the sheet plans its rows again, that the
+// choice comes back after a reload, that printing opens every panel, and that a page with folding switched off renders exactly
+// as before. Slow and needs Chrome, so it runs only with AM_E2E=1.
+import { test, before, after } from 'node:test';
+import assert from 'node:assert/strict';
+import { spawn, execFileSync } from 'node:child_process';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+import { connect, devtoolsUrl, findChrome } from '../src/video/export.js';
+
+const ROOT = fileURLToPath(new URL('..', import.meta.url));
+const CHROME = findChrome();
+const SKIP = process.env.AM_E2E !== '1'
+  ? 'set AM_E2E=1 to run the browser fold tests'
+  : !CHROME ? 'no Chrome found (set AM_CHROME)' : typeof WebSocket === 'undefined' ? 'needs Node 22 (built-in WebSocket)' : false;
+
+const DESKTOP = 1440;
+const LAYOUT_WAIT_MS = 1000; // the page waits 150 ms after a fold, then plans and applies (RESIZE_DELAY in layout-dom.js)
+
+const DRAFT = `---
+title: Fold check
+cols: 3
+lang: en
+collapse: true
+---
+Lead text.
+
+## A First panel
+This panel is a plain paragraph. It is long enough to wrap over a few lines so the row has a real height to plan.
+
+## B Second panel {collapsed}
+This panel starts folded. A reader opens it by clicking its head, and the sheet plans its rows again.
+
+## C Third panel
+A third panel keeps the row full, so the layout has something to balance when one panel changes height.
+`;
+
+const PLAIN = `---
+title: No folds
+cols: 2
+lang: en
+---
+## A One
+Text.
+
+## B Two
+Text.
+`;
+
+let tmp;
+let chrome;
+let cdp;
+let session;
+const files = {};
+
+const page = (method, params) => cdp.send(method, params, session);
+const evaluate = async (expression) => {
+  const r = await page('Runtime.evaluate', { expression, awaitPromise: true, returnByValue: true });
+  if (r.exceptionDetails) throw new Error(`page script error: ${r.exceptionDetails.exception?.description ?? r.exceptionDetails.text}`);
+  return r.result.value;
+};
+const open = async (file) => {
+  const loaded = cdp.once('Page.loadEventFired');
+  await page('Page.navigate', { url: pathToFileURL(file).href });
+  await loaded;
+  await evaluate('document.fonts.ready.then(() => true)');
+  // The sheet plans its rows right after load; a fold test that measured before it would compare two different layouts.
+  await evaluate(`new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(() => setTimeout(r, 200))))`);
+};
+// Every panel's id, open state and height: one read for all the checks below.
+const state = () => evaluate(`JSON.stringify([...document.querySelectorAll('.am-panel')].map((p) => ({
+  id: p.id,
+  fold: !!p.querySelector('.am-fold'),
+  open: p.querySelector('.am-fold')?.open ?? null,
+  h: Math.round(p.getBoundingClientRect().height),
+})))`).then(JSON.parse);
+
+before(async () => {
+  if (SKIP) return;
+  tmp = mkdtempSync(join(tmpdir(), 'am-fold-'));
+  const render = (src, name) => {
+    const draft = join(tmp, `${name}.md`);
+    const out = join(tmp, `${name}.html`);
+    writeFileSync(draft, src);
+    execFileSync(process.execPath, [join(ROOT, 'bin/am.js'), 'render', draft, '-o', out, '--no-open'], { stdio: 'ignore' });
+    files[name] = out;
+  };
+  render(DRAFT, 'fold');
+  render(PLAIN, 'plain');
+
+  chrome = spawn(CHROME, [
+    '--headless=new', '--remote-debugging-port=0', `--user-data-dir=${join(tmp, 'profile')}`,
+    '--no-first-run', '--no-default-browser-check', '--hide-scrollbars', '--mute-audio',
+    '--force-device-scale-factor=1', `--window-size=${DESKTOP},900`, 'about:blank',
+  ], { stdio: ['ignore', 'ignore', 'pipe'] });
+  cdp = await connect(await devtoolsUrl(chrome));
+  const { targetId } = await cdp.send('Target.createTarget', { url: 'about:blank' });
+  ({ sessionId: session } = await cdp.send('Target.attachToTarget', { targetId, flatten: true }));
+  await page('Page.enable');
+});
+
+after(async () => {
+  cdp?.close();
+  if (chrome) {
+    await new Promise((r) => {
+      if (chrome.exitCode !== null) return r();
+      const timer = setTimeout(r, 3000);
+      chrome.once('exit', () => { clearTimeout(timer); r(); });
+      chrome.kill();
+    });
+  }
+  if (tmp) rmSync(tmp, { recursive: true, force: true });
+});
+
+test('fold: page-level collapse makes every panel a fold, and {collapsed} starts one closed', { skip: SKIP, timeout: 60000 }, async () => {
+  await open(files.fold);
+  const panels = await state();
+  assert.deepEqual(panels.map((p) => p.id), ['panel-A', 'panel-B', 'panel-C']);
+  assert.deepEqual(panels.map((p) => p.fold), [true, true, true], 'every panel is a fold');
+  assert.deepEqual(panels.map((p) => p.open), [true, false, true], 'B starts folded, A and C start open');
+  assert.ok(panels[1].h < panels[0].h, 'a folded panel is shorter than an open one');
+});
+
+test('fold: a click on the head folds and unfolds, and the sheet plans its rows again', { skip: SKIP, timeout: 60000 }, async () => {
+  await open(files.fold);
+  const before = await state();
+  const closedHeight = before.find((p) => p.id === 'panel-A').h;
+
+  await evaluate(`document.querySelector('#panel-A > .am-fold > summary').click()`);
+  await new Promise((r) => setTimeout(r, LAYOUT_WAIT_MS));
+  const folded = await state();
+  assert.equal(folded.find((p) => p.id === 'panel-A').open, false, 'A is folded after the click');
+  assert.ok(folded.find((p) => p.id === 'panel-A').h < closedHeight, 'the folded panel got shorter');
+
+  await evaluate(`document.querySelector('#panel-A > .am-fold > summary').click()`);
+  await new Promise((r) => setTimeout(r, LAYOUT_WAIT_MS));
+  const reopened = await state();
+  assert.equal(reopened.find((p) => p.id === 'panel-A').open, true, 'A is open again');
+  assert.ok(reopened.find((p) => p.id === 'panel-A').h >= closedHeight - 1, 'the open panel got its height back');
+});
+
+test('fold: the reader choice survives a reload', { skip: SKIP, timeout: 60000 }, async () => {
+  await open(files.fold);
+  await evaluate(`document.querySelector('#panel-C > .am-fold > summary').click()`);
+  await new Promise((r) => setTimeout(r, LAYOUT_WAIT_MS));
+  assert.equal((await state()).find((p) => p.id === 'panel-C').open, false);
+  await open(files.fold);
+  assert.equal((await state()).find((p) => p.id === 'panel-C').open, false, 'C was still folded after the reload');
+  // Clean up the stored choice so no other test sees it.
+  await evaluate(`localStorage.removeItem('am-fold:' + location.pathname)`);
+});
+
+test('fold: printing opens every panel and the reader layout comes back afterwards', { skip: SKIP, timeout: 60000 }, async () => {
+  await open(files.fold);
+  await evaluate(`localStorage.removeItem('am-fold:' + location.pathname)`);
+  await open(files.fold);
+  // Emulate print media: that is what beforeprint/afterprint fire for in a headless browser.
+  await page('Emulation.setEmulatedMedia', { media: 'print' });
+  await new Promise((r) => setTimeout(r, 300));
+  assert.deepEqual((await state()).map((p) => p.open), [true, true, true], 'every panel prints open');
+  await page('Emulation.setEmulatedMedia', { media: '' });
+  await new Promise((r) => setTimeout(r, 400));
+  assert.deepEqual((await state()).map((p) => p.open), [true, false, true], 'the reader layout came back');
+});
+
+test('fold: a page without collapse renders no details and adds nothing to storage', { skip: SKIP, timeout: 60000 }, async () => {
+  await open(files.plain);
+  const panels = await state();
+  assert.deepEqual(panels.map((p) => p.fold), [false, false]);
+  // Only this page's own key matters: other pages tested in this browser share the file:// origin's storage.
+  const own = await evaluate(`localStorage.getItem('am-fold:' + location.pathname)`);
+  assert.equal(own, null, 'no fold key written for a page with no folds');
+});

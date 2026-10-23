@@ -53,7 +53,7 @@ if (panelList().length > 1) {
   // and may hold spans the server added, so it is never read here.
   const spanHint = (el) => Number(el.dataset.span) || 1;
   const diagramOnly = (el) => {
-    const body = el.querySelector(':scope > .am-panel-body');
+    const body = el.querySelector('.am-panel-body');
     return body && body.children.length === 1 ? body.querySelector(':scope > .am-diagram > svg') : null;
   };
   const naturalWidth = (svg) => Number(svg.getAttribute('width')) || 0;
@@ -244,6 +244,8 @@ if (panelList().length > 1) {
   addEventListener('resize', later);
   // A reader's text size changes every panel's text widths and heights, so the sheet is planned again like a resize.
   addEventListener('am-scale', later);
+  // A panel folded or unfolded, or a panel moved: heights and reading order changed, so plan again, like a resize.
+  addEventListener('am-replan', later);
   addEventListener('beforeprint', () => {
     printing = true;
     toPrint();

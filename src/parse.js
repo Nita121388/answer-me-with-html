@@ -51,6 +51,7 @@ export const VOICES = Object.freeze(['auto', 'elevenlabs', 'local', 'system', 'o
 
 const DEFAULT_META = Object.freeze({
   template: 'sheet',
+  collapse: false,
   theme: AUTO,
   style: '80',
   mode: 'auto',
@@ -59,6 +60,9 @@ const DEFAULT_META = Object.freeze({
 });
 
 const NUMERIC_KEYS = new Set(['cols', 'span']);
+// Panel attributes. collapse makes a panel a fold; collapsed starts it folded. They are booleans when written bare,
+// so `{collapse}` and `{collapse=true}` are the same thing.
+const FOLD_ATTRS = new Set(['collapse', 'collapsed']);
 const FENCE_OPEN = /^(`{3,}|~{3,})\s*([^\s`]*)\s*(.*)$/;
 const PANEL_HEADING = /^##\s+(.+?)\s*$/;
 const ATTR_BLOCK = /\s*\{([^{}]*)\}\s*$/;
@@ -338,7 +342,12 @@ function fractionalCount(key, value, line, keys) {
   return Number.isFinite(n) && !Number.isInteger(n) ? new ParseError(`${key} must be a whole number, not "${value}"`, line) : null;
 }
 
+// A bare attribute is `true`. For a fold attribute, "false" / "off" / "0" / "no" turn it off, so a page can fold every panel
+// in the frontmatter and still keep one panel open with {collapse=false}.
+const OFF = new Set(['false', 'off', '0', 'no']);
+
 function coerce(key, value) {
   if (NUMERIC_KEYS.has(key) && /^\d+$/.test(value)) return Number(value);
+  if (FOLD_ATTRS.has(key)) return value === true || !OFF.has(String(value).trim().toLowerCase());
   return value;
 }
