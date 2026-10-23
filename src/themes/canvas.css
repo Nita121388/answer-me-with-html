@@ -1,0 +1,77 @@
+// The canvas template stylesheet: a viewport that clips, a stage that the page script pans and zooms, an SVG layer of edges under
+// absolutely positioned panels (src/templates/canvas.js, src/runtime/canvas-dom.js).
+//
+// Without JavaScript the stage renders at its computed size with no panning: every node sits where the build put it, and the page
+// scrolls. That is the honest fallback, and it prints.
+
+.am-canvas { padding: 0 0 24px; }
+
+/* The viewport clips the stage and owns the pan: the stage moves inside it with a transform, so nothing reflows while panning. */
+.am-canvas-viewport {
+  position: relative; overflow: hidden;
+  height: calc(100vh - 120px); min-height: 420px;
+  border: var(--bw) solid var(--line); border-radius: var(--radius);
+  background: var(--bg);
+  /* A faint dot grid, drawn with two gradients so no image is needed. */
+  background-image: radial-gradient(circle, var(--line-2) 1px, transparent 1.2px);
+  background-size: 24px 24px;
+  cursor: grab; touch-action: none;
+}
+html[data-am-panning] .am-canvas-viewport { cursor: grabbing; }
+
+/* No script: the viewport scrolls instead of panning, so every node is reachable. */
+html:not([data-canvas-live]) .am-canvas-viewport { overflow: auto; cursor: auto; }
+
+.am-canvas-stage {
+  position: relative;
+  transform-origin: 0 0;
+  will-change: transform;
+}
+
+.am-canvas-edges { position: absolute; inset: 0; pointer-events: none; overflow: visible; }
+.am-canvas-edge path {
+  fill: none; stroke: var(--line-2); stroke-width: 1.6;
+}
+.am-canvas-edge-label {
+  font: var(--am-fs-label)/1.3 var(--font-sans); fill: var(--ink-2);
+  paint-order: stroke; stroke: var(--bg); stroke-width: 4px; stroke-linejoin: round;
+}
+
+.am-canvas-nodes { position: absolute; inset: 0; }
+
+/* A node is a panel taken out of the document flow: its width comes from the template, its height from its content. */
+.am-canvas .am-canvas-node {
+  position: absolute; margin: 0;
+  /* The planner's flex rules do not apply here; a node sizes to the width the template gave it. */
+  display: block;
+  box-shadow: var(--shadow);
+}
+/* The head is the handle: press it and drag the node anywhere on the board. */
+.am-canvas .am-panel-head { cursor: grab; touch-action: none; }
+html[data-am-panning] .am-canvas .am-panel-head { cursor: grabbing; }
+.am-canvas .am-panel-head:active { cursor: grabbing; }
+.am-canvas-node:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
+.am-canvas-node[data-am-node-moving] { z-index: 5; box-shadow: 0 12px 40px rgba(0, 0, 0, .25); }
+
+/* The zoom controls sit in the corner of the viewport. */
+.am-canvas-zoom {
+  position: absolute; inset-block-end: 12px; inset-inline-end: 12px; z-index: 6;
+  display: flex; gap: 6px;
+}
+html:not([data-canvas-live]) .am-canvas-zoom { display: none; }
+
+.am-canvas-dropped { margin: 12px 4px 0; font: var(--am-fs-small)/1.5 var(--font-mono); color: var(--ink-2); }
+
+@media (prefers-reduced-motion: reduce) {
+  .am-canvas-stage { will-change: auto; }
+}
+
+/* On paper a board is a picture: the stage keeps the build's layout at 1:1, edges included, and the viewport stops clipping. */
+@media print {
+  .am-canvas { break-inside: avoid; }
+  .am-canvas-viewport {
+    height: auto; min-height: 0; overflow: visible; border: 0; background: none; cursor: auto;
+  }
+  .am-canvas-stage { transform: none !important; }
+  .am-canvas-zoom { display: none !important; }
+}

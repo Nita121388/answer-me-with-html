@@ -65,7 +65,9 @@ Usage:
 const FORMAT = `Draft format (extended Markdown)
 
 ---
-template: sheet        # sheet: blueprint board (default, multi-panel grid) | doc: linear explainer (one column + contents)
+template: sheet        # sheet: board (default, justified grid) | doc: linear explainer (one column + contents)
+                       # canvas: an infinite board of panels that the reader pans, zooms and drags; the edges come from
+                       #         a canvas fence in the intro (before the first panel): A -> B or A -> B: label
 theme: auto            # auto (default): paper for the doc template or text only, blueprint with diagrams | blueprint | shadcn | paper; switchable in the page
 title: Page title      # or use "# Title" as the first line of the body
 subtitle: Subtitle     # optional
@@ -80,6 +82,7 @@ Intro (optional, shown below the title)
 
 ## A Panel title {span=2 meta="top-right note" collapse collapsed}
 {span=2} wide hint; {bare} no title bar; {collapse} this panel folds even when the page does not; {collapsed} it starts folded.
+On a canvas page {x=120 y=40} pins a panel to that spot; panels without it are placed along the edges.
 Plain Markdown: paragraphs, lists, tables, quotes, inline code...
 Write ok / no / warn in a table cell (text may follow, e.g. "ok approved") to get a ✓ / ✗ / ! badge.
 

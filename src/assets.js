@@ -14,6 +14,7 @@ export const DIFF_CSS = read('./themes/diff.css');
 export const DELTA_CSS = read('./themes/delta.css');
 export const RTL_CSS = read('./themes/rtl.css');
 export const CHART_CSS = read('./themes/chart.css');
+export const CANVAS_CSS = read('./themes/canvas.css');
 export const MATH_CSS = composeMathCss(read('./themes/math.css'));
 // A theme's own font face, by the name its `font` field gives (src/themes/font-css.js).
 export const FONT_CSS = Object.fromEntries(FONT_NAMES.map((name) => [name, composeFontCss(name)]));
@@ -21,6 +22,7 @@ export const DELTA_JS = read('./runtime/delta.js');
 export const UPDATE_CSS = read('./themes/update.css');
 export const UPDATE_JS = read('./runtime/update.js');
 export const LIVE_JS = read('./runtime/live.js');
+export const CANVAS_JS = read('./runtime/canvas-dom.js');
 export const CLOSE_AFTER_CSS = read('./themes/close-after-reply.css');
 export const CLOSE_AFTER_JS = read('./runtime/close-after-reply.js');
 export const VIDEO_CSS = read('./themes/video.css');

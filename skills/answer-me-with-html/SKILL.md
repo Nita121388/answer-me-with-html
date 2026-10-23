@@ -108,6 +108,7 @@ AM_EOF
 ```markdown
 ---
 template: sheet     # sheet board (default, one-screen overview) | doc linear explanation (read step by step)
+                    # canvas: an infinite board — the reader pans, zooms and drags every panel, and the edges are drawn
 theme: auto         # auto (default): paper for doc or text-only drafts, blueprint with diagrams | blueprint | shadcn | paper | a theme the user made (am list shows it)
 title: Title
 subtitle: One-line summary     # optional
@@ -155,6 +156,8 @@ Table status words: ok / no / warn (may carry text: "ok approved") → ✓ / ✗
 Selection rules:
 - Conclusion first. The first panel or the lead gives the core answer; the following panels give the evidence.
 - One panel, one question. With more than 8 panels, split the page or cut panels.
+- On a `canvas` page the edges are a `canvas` fence in the intro, before the first panel: one `A -> B` or `A -> B: label`
+  per line, naming panels by their id. Panels are placed by the graph; `{x=120 y=40}` pins one to that spot.
 - `{collapse}` makes this panel a fold even when the page does not set `collapse: true`; `{collapsed}` also starts it closed.
   A fold is a native `<details>`, so it opens and closes with no script, works from the keyboard, and prints open.
   A `{bare}` panel has no head, so it never folds.

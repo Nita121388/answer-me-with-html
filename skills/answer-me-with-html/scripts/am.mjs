@@ -734,6 +734,7 @@ var DELTA_CSS = `/* Change markers (only on pages that have one). Only the Chang
 `;
 var RTL_CSS = '/* Right-to-left pages (html[dir="rtl"]: Hebrew, Arabic, Persian, Urdu, Yiddish). base.css uses logical properties, so the layout\n   mirrors by itself; this file holds only what logical properties cannot say. A left-to-right page never carries it. */\n\n/* Code, diffs and paths read left to right in every language. Inline code is isolated, so the text around it keeps its order. */\nhtml[dir="rtl"] .am-codeblock, html[dir="rtl"] .am-code, html[dir="rtl"] pre { direction: ltr; text-align: left; }\nhtml[dir="rtl"] :not(pre) > code { direction: ltr; unicode-bidi: isolate; }\n\n/* Small labels use the monospace font. No common monospace font has Hebrew or Arabic letters, so the browser borrows a fixed-width\n   fallback that spaces the letters apart; letter spacing and capitals also break these scripts. Labels use the sans font instead. */\nhtml[dir="rtl"] .am-md th, html[dir="rtl"] .am-kv dt, html[dir="rtl"] .am-head-meta b, html[dir="rtl"] .am-panel-meta,\nhtml[dir="rtl"] .am-annot-meta, html[dir="rtl"] .am-tree-tag, html[dir="rtl"] .am-timeline--v .am-tl-when,\nhtml[dir="rtl"] .am-diagram .am-cluster-label, html[dir="rtl"] .am-delta-bar, html[dir="rtl"] .am-lim-val,\nhtml[dir="rtl"] .am-colophon, html[dir="rtl"] .am-reply textarea {\n  font-family: var(--font-sans); letter-spacing: normal; text-transform: none;\n}\nhtml[dir="rtl"] .am-head h1 { letter-spacing: normal; }\n/* The annotated sentence is set in the sans font too; src/components/annot.js measures the placement of its notes in that font. */\nhtml[dir="rtl"] .am-annot-line { font-family: var(--font-sans); }\n\n/* Diagram text: the drawing is already mirrored (src/components/flow.js, sequence.js); the text inside reads right to left. */\nhtml[dir="rtl"] .am-diagram svg { direction: rtl; }\n\n/* Limits scale: the ticks are placed from the right (src/components/limits.js), so each one centres on its point from that side. */\nhtml[dir="rtl"] .am-lim-ticks span { transform: translateX(50%); }\nhtml[dir="rtl"] .am-lim-ticks span:first-child { transform: none; }\n\n/* The limits value is written in the page language (src/languages/he.js: "420 of 1000 KB" in Hebrew words), so it reads right to left\n   like the label. The label, its note and the value are isolated from each other: "Redis" at the end of a label and "70%" at the\n   start of its note would otherwise run together as one left-to-right piece. */\nhtml[dir="rtl"] .am-lim-head > span, html[dir="rtl"] .am-lim-note, html[dir="rtl"] .am-lim-val { unicode-bidi: isolate; }\n\n/* Horizontal timeline: a date written the Hebrew way (15.11.2026) is wider than a year, and in a narrow panel the dates of\n   neighbouring items ran into each other ("1.12.202615.11.2026"). The date shrinks to fit its column, never above its usual 15px. */\nhtml[dir="rtl"] .am-timeline--h .am-tl-when { font-size: min(var(--am-fs-heading), calc(100cqi / var(--n, 1) / 6.2)); white-space: nowrap; }\n@container (max-width: 560px) {\n  html[dir="rtl"] .am-timeline--h .am-tl-when { font-size: var(--am-fs-heading); }\n}\n\n/* Video player (src/video/render.js): the scenes lay out right to left like a page, and what video.css places with left / right mirrors here.\n   A theme mirrors its own placements with video.rtlCss. The controls row stays left to right, as in common video players: the play\n   button on the left, then the clock, the progress bar with its chapter ticks, the speed and the export button. */\nhtml[dir="rtl"][data-video] .amv-ruler--top span + span, html[dir="rtl"][data-video] .amv-ruler--bottom span + span { border-left: 0; border-right: 1px solid var(--line); }\nhtml[dir="rtl"][data-video] .amv-titleblock { text-align: right; }\n/* The title block labels and the scene header numbers use the monospace font in video.css: sans here, as for the small page labels above. */\nhtml[dir="rtl"][data-video] .amv-titleblock b, html[dir="rtl"][data-video] .amv-scene-meta { font-family: var(--font-sans); letter-spacing: normal; }\nhtml[dir="rtl"][data-video] .amv-titleblock div + div { border-left: 0; border-right: 1px solid var(--line); }\nhtml[dir="rtl"][data-video] .amv-controls { direction: ltr; }\n\n/* Remark mode: a note inside a code block reads in the page direction, not in the left-to-right direction of the code. */\nhtml[dir="rtl"] pre .am-mark-note { direction: rtl; }\n/* A code block reads left to right, so its inline start is its left edge; the mark bar goes to the right like the other marks. */\nhtml[dir="rtl"] pre.am-mark { border-inline-start: 0; padding-inline-start: 0; border-inline-end: 3px solid var(--mark); }\n';
 var CHART_CSS = '/* Charts (src/components/chart.js). Only a page with a chart carries this file, the way only a page with math carries the math styles.\n   Series colors are the diagram tokens --series-1 to --series-6 (docs/reference.md, "Diagram tokens"): a theme that sets one wins, and\n   the fallbacks are the fixed palette below (Tableau 10 style), a set for light and a set for dark. Bars carry their value, the legend names\n   the series and the data table holds the numbers, so a color is never the only way to read a bar. The axis, grid and labels read the usual\n   tokens, so a theme that sets nothing still gets a chart in its own colors. */\nhtml {\n  --am-ch-1: #4e79a7; --am-ch-2: #f28e2b; --am-ch-3: #e15759; --am-ch-4: #76b7b2; --am-ch-5: #59a14f; --am-ch-6: #b07aa1;\n}\nhtml[data-mode="dark"] {\n  --am-ch-1: #7aa6d6; --am-ch-2: #f5a55a; --am-ch-3: #ef7f80; --am-ch-4: #8fd0cb; --am-ch-5: #7cc472; --am-ch-6: #c99bbd;\n}\n@media (prefers-color-scheme: dark) {\n  html[data-mode="auto"] {\n    --am-ch-1: #7aa6d6; --am-ch-2: #f5a55a; --am-ch-3: #ef7f80; --am-ch-4: #8fd0cb; --am-ch-5: #7cc472; --am-ch-6: #c99bbd;\n  }\n}\n\n.am-ch-s1 { fill: var(--series-1, var(--am-ch-1)); }\n.am-ch-s2 { fill: var(--series-2, var(--am-ch-2)); }\n.am-ch-s3 { fill: var(--series-3, var(--am-ch-3)); }\n.am-ch-s4 { fill: var(--series-4, var(--am-ch-4)); }\n.am-ch-s5 { fill: var(--series-5, var(--am-ch-5)); }\n.am-ch-s6 { fill: var(--series-6, var(--am-ch-6)); }\n/* A highlighted row of a single series takes the accent color; in a chart with a highlight the other rows are gray (a line is never gray). */\n.am-ch-hi { fill: var(--accent, #1d5fbf); }\n.am-ch-row.is-dim .am-ch-bar, .am-ch-row.is-dim .am-ch-slice, .am-ch-row.is-dim .am-ch-sw { fill: var(--line-2, #d6dae1); fill: color-mix(in oklch, var(--ink-3, #8b929e) 40%, var(--paper, #ffffff)); }\n\n/* A line: a stroke in the series color, a dot on each point; the dot has an outline in the paper color where lines cross. A pie slice has\n   the same outline, which is the gap between slices. */\n.am-ch-line { fill: none; stroke-width: 2.5; stroke-linecap: round; }\n.am-ch-line.am-ch-s1 { stroke: var(--series-1, var(--am-ch-1)); }\n.am-ch-line.am-ch-s2 { stroke: var(--series-2, var(--am-ch-2)); }\n.am-ch-line.am-ch-s3 { stroke: var(--series-3, var(--am-ch-3)); }\n.am-ch-line.am-ch-s4 { stroke: var(--series-4, var(--am-ch-4)); }\n.am-ch-line.am-ch-s5 { stroke: var(--series-5, var(--am-ch-5)); }\n.am-ch-line.am-ch-s6 { stroke: var(--series-6, var(--am-ch-6)); }\n.am-ch-dot, .am-ch-slice { stroke: var(--paper, #ffffff); stroke-width: 1.5; }\n.am-ch-slice { stroke-width: 2; stroke-linejoin: round; }\n.am-ch-guide { stroke: var(--ink-3, #8b929e); stroke-width: 1; stroke-dasharray: 3 3; }\n\n.am-ch-grid { stroke: var(--line-2, #d6dae1); stroke-width: 1; }\n.am-ch-zero { stroke: var(--ink-3, #8b929e); stroke-width: 1; }\n.am-diagram .am-ch-cat, .am-diagram .am-ch-leg { fill: var(--ink-2, #4b5260); font-size: var(--am-fs-d-chartCat); }\n.am-diagram .am-ch-tick, .am-diagram .am-ch-val { fill: var(--ink-2, #4b5260); font-size: var(--am-fs-d-chartTick); }\n/* The value labels of a highlighted row in a chart with several series take the color of their series, in a heavier weight to read on it. */\n.am-diagram .am-ch-val.am-ch-s1, .am-diagram .am-ch-val.am-ch-s2, .am-diagram .am-ch-val.am-ch-s3, .am-diagram .am-ch-val.am-ch-s4, .am-diagram .am-ch-val.am-ch-s5, .am-diagram .am-ch-val.am-ch-s6 { font-weight: 600; }\n.am-diagram .am-ch-val.am-ch-s1 { fill: var(--series-1, var(--am-ch-1)); }\n.am-diagram .am-ch-val.am-ch-s2 { fill: var(--series-2, var(--am-ch-2)); }\n.am-diagram .am-ch-val.am-ch-s3 { fill: var(--series-3, var(--am-ch-3)); }\n.am-diagram .am-ch-val.am-ch-s4 { fill: var(--series-4, var(--am-ch-4)); }\n.am-diagram .am-ch-val.am-ch-s5 { fill: var(--series-5, var(--am-ch-5)); }\n.am-diagram .am-ch-val.am-ch-s6 { fill: var(--series-6, var(--am-ch-6)); }\n/* A value label may sit over a line or a guide: a halo in the paper color keeps it readable. */\n.am-diagram .am-ch-val { paint-order: stroke; stroke: var(--paper, #ffffff); stroke-width: 3px; stroke-linejoin: round; }\n.am-diagram .am-ch-num { fill: var(--ink-2, #4b5260); font-size: var(--am-fs-d-chartCat); font-variant-numeric: tabular-nums; }\n.am-diagram .am-ch-total { fill: var(--ink, #1a1d23); font-weight: 600; }\n\n/* The data table under the chart: collapsed, for a screen reader and for a reader who wants the numbers. It looks like a Markdown table. */\n.am-ch-data { margin-top: 14px; padding-top: 10px; border-top: 1px solid var(--line-2); text-align: start; font-size: var(--am-fs-text); }\n.am-ch-data summary { cursor: pointer; list-style: none; display: inline-flex; align-items: center; gap: 6px; font: var(--am-fs-label)/1.3 var(--font-mono); color: var(--ink-3); letter-spacing: .04em; }\n.am-ch-data summary::-webkit-details-marker { display: none; }\n.am-ch-data summary::before { content: ""; width: 0; height: 0; border-block: 4px solid transparent; border-inline-start: 6px solid currentColor; transition: transform .15s; }\n.am-ch-data[open] summary::before { transform: rotate(90deg); }\n/* The triangle points to the end side, which is the left on a right-to-left page: it turns the other way to point down. */\nhtml[dir="rtl"] .am-ch-data[open] summary::before { transform: rotate(-90deg); }\n@media (prefers-reduced-motion: reduce) { .am-ch-data summary::before { transition: none; } }\n.am-ch-data summary:hover { color: var(--ink); }\n.am-ch-data table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: var(--am-fs-text); }\n.am-ch-data thead th { font: var(--am-fs-label)/1.3 var(--font-mono); color: var(--ink-2); font-weight: 400; padding: 6px 10px; border-bottom: 1px solid var(--line); }\n.am-ch-data thead th::before { content: ""; display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-inline-end: 6px; }\n.am-ch-data thead th:nth-child(2)::before { background: var(--series-1, var(--am-ch-1)); }\n.am-ch-data thead th:nth-child(3)::before { background: var(--series-2, var(--am-ch-2)); }\n.am-ch-data thead th:nth-child(4)::before { background: var(--series-3, var(--am-ch-3)); }\n.am-ch-data thead th:nth-child(5)::before { background: var(--series-4, var(--am-ch-4)); }\n.am-ch-data thead th:nth-child(6)::before { background: var(--series-5, var(--am-ch-5)); }\n.am-ch-data thead th:nth-child(7)::before { background: var(--series-6, var(--am-ch-6)); }\n.am-ch-data--pie thead th::before { content: none; }\n.am-ch-data th, .am-ch-data td { padding: 7px 10px; font-variant-numeric: tabular-nums; }\n.am-ch-data th[scope="row"] { text-align: start; font-weight: 400; }\n/* Numbers read left to right in every language and line up on their right edge, under the series name. */\n.am-ch-data td, .am-ch-data thead th { text-align: right; }\n.am-ch-data tbody tr:nth-child(even) > * { background: var(--fill); }\n';
+var CANVAS_CSS = "// The canvas template stylesheet: a viewport that clips, a stage that the page script pans and zooms, an SVG layer of edges under\n// absolutely positioned panels (src/templates/canvas.js, src/runtime/canvas-dom.js).\n//\n// Without JavaScript the stage renders at its computed size with no panning: every node sits where the build put it, and the page\n// scrolls. That is the honest fallback, and it prints.\n\n.am-canvas { padding: 0 0 24px; }\n\n/* The viewport clips the stage and owns the pan: the stage moves inside it with a transform, so nothing reflows while panning. */\n.am-canvas-viewport {\n  position: relative; overflow: hidden;\n  height: calc(100vh - 120px); min-height: 420px;\n  border: var(--bw) solid var(--line); border-radius: var(--radius);\n  background: var(--bg);\n  /* A faint dot grid, drawn with two gradients so no image is needed. */\n  background-image: radial-gradient(circle, var(--line-2) 1px, transparent 1.2px);\n  background-size: 24px 24px;\n  cursor: grab; touch-action: none;\n}\nhtml[data-am-panning] .am-canvas-viewport { cursor: grabbing; }\n\n/* No script: the viewport scrolls instead of panning, so every node is reachable. */\nhtml:not([data-canvas-live]) .am-canvas-viewport { overflow: auto; cursor: auto; }\n\n.am-canvas-stage {\n  position: relative;\n  transform-origin: 0 0;\n  will-change: transform;\n}\n\n.am-canvas-edges { position: absolute; inset: 0; pointer-events: none; overflow: visible; }\n.am-canvas-edge path {\n  fill: none; stroke: var(--line-2); stroke-width: 1.6;\n}\n.am-canvas-edge-label {\n  font: var(--am-fs-label)/1.3 var(--font-sans); fill: var(--ink-2);\n  paint-order: stroke; stroke: var(--bg); stroke-width: 4px; stroke-linejoin: round;\n}\n\n.am-canvas-nodes { position: absolute; inset: 0; }\n\n/* A node is a panel taken out of the document flow: its width comes from the template, its height from its content. */\n.am-canvas .am-canvas-node {\n  position: absolute; margin: 0;\n  /* The planner's flex rules do not apply here; a node sizes to the width the template gave it. */\n  display: block;\n  box-shadow: var(--shadow);\n}\n/* The head is the handle: press it and drag the node anywhere on the board. */\n.am-canvas .am-panel-head { cursor: grab; touch-action: none; }\nhtml[data-am-panning] .am-canvas .am-panel-head { cursor: grabbing; }\n.am-canvas .am-panel-head:active { cursor: grabbing; }\n.am-canvas-node:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }\n.am-canvas-node[data-am-node-moving] { z-index: 5; box-shadow: 0 12px 40px rgba(0, 0, 0, .25); }\n\n/* The zoom controls sit in the corner of the viewport. */\n.am-canvas-zoom {\n  position: absolute; inset-block-end: 12px; inset-inline-end: 12px; z-index: 6;\n  display: flex; gap: 6px;\n}\nhtml:not([data-canvas-live]) .am-canvas-zoom { display: none; }\n\n.am-canvas-dropped { margin: 12px 4px 0; font: var(--am-fs-small)/1.5 var(--font-mono); color: var(--ink-2); }\n\n@media (prefers-reduced-motion: reduce) {\n  .am-canvas-stage { will-change: auto; }\n}\n\n/* On paper a board is a picture: the stage keeps the build's layout at 1:1, edges included, and the viewport stops clipping. */\n@media print {\n  .am-canvas { break-inside: avoid; }\n  .am-canvas-viewport {\n    height: auto; min-height: 0; overflow: visible; border: 0; background: none; cursor: auto;\n  }\n  .am-canvas-stage { transform: none !important; }\n  .am-canvas-zoom { display: none !important; }\n}\n";
 var MATH_CSS = `/*
 Temml.woff2 is a clone of KaTeX_Script-Regular, except that the code points
 have been changed from ASCII to Unicode Mathematical Alphanumeric Symbols Script capitals,
@@ -1150,6 +1151,7 @@ var UPDATE_JS = `// Pages with a new-version button only: src/render.js adds thi
 })();
 `;
 var LIVE_JS = "// am serve only: src/serve.js adds this script to the page it sends (never to the file on disk), with the page's event link and the\n// labels in the page language. When the page file changes, the server sends one \"changed\" event. A served page is sandboxed and has\n// no localStorage, so Reply answers, comments and remarks live only in this tab: a reader who has answered, commented or marked\n// anything gets a notice and reloads when ready; otherwise the page reloads by itself.\n(() => {\n  const { url, ui } = JSON.parse(document.currentScript.dataset.live);\n  if (!window.EventSource) return;\n  // The page comes back where the reader was. A sandboxed page has an opaque origin, and Chrome drops its history.state on reload,\n  // so the position goes in window.name, which a reload keeps, with the page path: a reload can land on another page (a 404 without\n  // this script, when the file was removed), and the value must not move a page it was not saved on. It is read once and cleared.\n  const SCROLL = /^am-scroll:(.*):(\\d+)$/;\n  const saved = SCROLL.exec(window.name);\n  if (saved) window.name = '';\n  if (saved && saved[1] === location.pathname) {\n    // Otherwise the browser's own restore runs after load and puts the page back at the top.\n    try {\n      history.scrollRestoration = 'manual';\n    } catch {\n      // Not settable here: the restore below may lose to the browser's.\n    }\n    // The sheet grid lays itself out again after load and the page can shrink for a moment, which drops the position to the top.\n    // So hold it for a second after load, and let go as soon as the reader scrolls, clicks or types.\n    const y = Number(saved[2]);\n    const READER = ['wheel', 'touchstart', 'keydown', 'pointerdown'];\n    const root = document.documentElement;\n    let until = 0;\n    let height = 0; // the page height at the last frame\n    const stop = () => { until = 0; };\n    // A scrollbar drag sends none of the events above, only scroll. The page is tall enough to stay at y and has not changed height\n    // since the last frame, so the move is not the layout pushing the page up: the reader moved it.\n    const moved = () => {\n      if (Math.abs(scrollY - y) > 1 && root.scrollHeight - innerHeight >= y && root.scrollHeight === height) stop();\n    };\n    const hold = () => {\n      if (Date.now() > until) {\n        READER.forEach((type) => removeEventListener(type, stop, true));\n        return removeEventListener('scroll', moved);\n      }\n      if (Math.abs(scrollY - y) > 1) scrollTo(0, y);\n      height = root.scrollHeight;\n      requestAnimationFrame(hold);\n    };\n    addEventListener('load', () => {\n      until = Date.now() + 1000;\n      READER.forEach((type) => addEventListener(type, stop, { capture: true, passive: true }));\n      addEventListener('scroll', moved, { passive: true });\n      hold();\n    }, { once: true });\n  }\n  // Theme and mode are page settings, not the reader's input.\n  let input = false;\n  const typed = (e) => { if (!e.target.closest?.('.am-toolbar')) input = true; };\n  document.addEventListener('input', typed, true);\n  document.addEventListener('change', typed, true);\n  // A click on the option that is already picked confirms the suggestion (src/runtime/reply.js) without a change event.\n  document.addEventListener('click', (e) => { if (e.target.closest?.('.am-ask input')) input = true; }, true);\n  const hasInput = () => input || Boolean(window.__amRemarkData?.().length);\n\n  const reload = () => {\n    if (!window.name || SCROLL.test(window.name)) window.name = `am-scroll:${location.pathname}:${Math.round(scrollY)}`;\n    location.reload();\n  };\n  let notice = null;\n  new EventSource(url).addEventListener('changed', () => {\n    if (!hasInput()) return reload();\n    if (notice) return;\n    // Styled inline, with the right-to-left fix in code, because this script is added at serve time: the page's stylesheet and\n    // rtl.css were built without it.\n    notice = document.createElement('div');\n    notice.setAttribute('role', 'status');\n    notice.style.cssText = 'position:fixed;inset-block-end:16px;inset-inline-start:50%;translate:-50% 0;z-index:1000;display:flex;align-items:center;gap:10px;'\n      + 'padding:8px 12px;font-size:var(--am-fs-text);color:var(--ink);background:var(--paper);border:1px solid var(--line-2);border-radius:var(--radius);box-shadow:0 8px 30px rgba(0,0,0,.2)';\n    if (document.documentElement.dir === 'rtl') notice.style.translate = '50% 0';\n    // The reply bar (src/runtime/reply.js) sits at the same place and shows under the same condition, so the notice goes above it.\n    const place = () => {\n      const bar = document.querySelector('.am-reply-bar:not([hidden])');\n      notice.style.insetBlockEnd = bar ? `${innerHeight - bar.getBoundingClientRect().top + 8}px` : '16px';\n    };\n    const bar = document.querySelector('.am-reply-bar');\n    if (bar) new MutationObserver(place).observe(bar, { attributes: true, attributeFilter: ['hidden'] });\n    addEventListener('resize', place);\n    const button = Object.assign(document.createElement('button'), { type: 'button', className: 'am-btn', textContent: ui.reload });\n    button.addEventListener('click', reload);\n    notice.append(`${ui.updated} \xB7`, button);\n    document.body.append(notice);\n    place();\n  });\n})();\n";
+var CANVAS_JS = "// The canvas board (src/templates/canvas.js): pan, zoom, and a node that the reader drags anywhere.\n//\n// The edges are drawn here as well as in the markup: the build draws them once from the layout it computed, and every move of a\n// node redraws the ones that touch it. A redraw is one path attribute, so the whole board keeps up with the pointer.\n//\n// The arrangement lives in this browser under one key, built from the node ids the page rendered, so a page whose panels changed\n// keeps its own layout instead of reading a stale one.\n(() => {\n  const viewport = document.querySelector('.am-canvas-viewport');\n  const stage = document.querySelector('[data-canvas-stage]');\n  if (!viewport || !stage) return;\n  const nodes = [...stage.querySelectorAll('.am-canvas-node')];\n  if (!nodes.length) return;\n\n  const html = document.documentElement;\n  const ids = () => nodes.map((n) => n.id);\n  const RENDERED = ids().map((id) => id);\n  const storeKey = `am-canvas:${location.pathname}:${RENDERED.join(',')}`;\n\n  const MIN_SCALE = 0.25;\n  const MAX_SCALE = 2.5;\n\n  let scale = 1;\n  let x = 0;\n  let y = 0;\n\n  const apply = () => {\n    stage.style.transform = `translate(${x.toFixed(2)}px, ${y.toFixed(2)}px) scale(${scale.toFixed(4)})`;\n    const zoomLabel = document.querySelector('[data-am=\"canvas-zoom-value\"]');\n    if (zoomLabel) zoomLabel.textContent = `${Math.round(scale * 100)}%`;\n  };\n\n  // Zoom about a point in viewport coordinates, so the board does not jump away from the pointer.\n  const zoomTo = (next, px, py) => {\n    next = Math.max(MIN_SCALE, Math.min(MAX_SCALE, next));\n    if (Math.abs(next - scale) < 0.0001) return;\n    const r = next / scale;\n    x = px - (px - x) * r;\n    y = py - (py - y) * r;\n    scale = next;\n    apply();\n  };\n\n  // ---- the arrangement ----\n  const positions = () => {\n    const out = {};\n    for (const n of nodes) out[n.id] = { x: parseFloat(n.style.left) || 0, y: parseFloat(n.style.top) || 0 };\n    return out;\n  };\n  const saveArrangement = () => {\n    try {\n      localStorage.setItem(storeKey, JSON.stringify({ nodes: positions(), view: { x, y, scale } }));\n    } catch {\n      // Storage may be off; the arrangement then lasts until the page closes.\n    }\n  };\n  const loadArrangement = () => {\n    try {\n      const saved = JSON.parse(localStorage.getItem(storeKey));\n      if (!saved || typeof saved !== 'object') return null;\n      const my = RENDERED;\n      const at = saved.nodes && typeof saved.nodes === 'object' ? saved.nodes : {};\n      if (!my.every((id) => at[id] && Number.isFinite(at[id].x) && Number.isFinite(at[id].y))) return null;\n      return saved;\n    } catch {\n      return null;\n    }\n  };\n\n  // ---- edges ----\n  const edgeGroups = [...stage.querySelectorAll('.am-canvas-edge')];\n  const boxOf = (node) => ({\n    x: parseFloat(node.style.left) || 0,\n    y: parseFloat(node.style.top) || 0,\n    w: node.offsetWidth,\n    h: node.offsetHeight,\n  });\n  // The same curve the template draws (src/templates/canvas.js edgePath): out of the side that faces the other node.\n  const pathFor = (a, b) => {\n    const dx = b.x + b.w / 2 - (a.x + a.w / 2);\n    const dy = b.y + b.h / 2 - (a.y + a.h / 2);\n    const rightward = dx >= 0;\n    const x1 = rightward ? a.x + a.w : a.x;\n    const x2 = rightward ? b.x : b.x + b.w;\n    const y1 = a.y + a.h / 2;\n    const y2 = b.y + b.h / 2;\n    const bend = Math.max(40, Math.min(140, Math.abs(x2 - x1) * 0.5)) * (rightward ? 1 : -1);\n    const lift = Math.abs(dx) < 30 ? Math.sign(dy || 1) * 0 : 0;\n    const f = (n) => Math.round(n * 100) / 100;\n    return `M${f(x1)},${f(y1)} C${f(x1 + bend)},${f(y1 + lift)} ${f(x2 - bend)},${f(y2 + lift)} ${f(x2)},${f(y2)}`;\n  };\n  const drawEdges = () => {\n    for (const g of edgeGroups) {\n      const a = document.getElementById(g.dataset.from);\n      const b = document.getElementById(g.dataset.to);\n      if (!a || !b) continue;\n      const path = g.querySelector('path');\n      const label = g.querySelector('.am-canvas-edge-label');\n      path.setAttribute('d', pathFor(boxOf(a), boxOf(b)));\n      if (label) {\n        const ba = boxOf(a);\n        const bb = boxOf(b);\n        label.setAttribute('x', String(Math.round((ba.x + ba.w + bb.x) / 2)));\n        label.setAttribute('y', String(Math.round((ba.y + ba.h / 2 + bb.y + bb.h / 2) / 2)));\n      }\n    }\n  };\n\n  // ---- panning ----\n  let panning = false;\n  let panId = null;\n  let panFrom = null;\n  viewport.addEventListener('pointerdown', (e) => {\n    // A press that starts on a node belongs to the node; the node handler stops it there.\n    if (e.button !== 0 || panning) return;\n    panning = true;\n    panId = e.pointerId;\n    panFrom = { x: e.clientX - x, y: e.clientY - y };\n    html.setAttribute('data-am-panning', '');\n    viewport.setPointerCapture?.(e.pointerId);\n  });\n  viewport.addEventListener('pointermove', (e) => {\n    if (!panning || e.pointerId !== panId) return;\n    x = e.clientX - panFrom.x;\n    y = e.clientY - panFrom.y;\n    apply();\n  });\n  const endPan = (e) => {\n    if (!panning || e.pointerId !== panId) return;\n    panning = false;\n    panId = null;\n    html.removeAttribute('data-am-panning');\n    try {\n      viewport.releasePointerCapture(e.pointerId);\n    } catch {}\n    saveArrangement();\n  };\n  viewport.addEventListener('pointerup', endPan);\n  viewport.addEventListener('pointercancel', endPan);\n\n  // The wheel zooms about the pointer. A trackpad pinch arrives as a wheel with ctrlKey, which is the same gesture to us.\n  viewport.addEventListener('wheel', (e) => {\n    e.preventDefault();\n    const r = viewport.getBoundingClientRect();\n    const dy = e.deltaMode === 1 ? e.deltaY * 16 : e.deltaMode === 2 ? e.deltaY * 400 : e.deltaY;\n    zoomTo(scale * Math.exp(-Math.max(-200, Math.min(200, dy)) * 0.0015), e.clientX - r.left, e.clientY - r.top);\n    saveArrangement();\n  }, { passive: false });\n\n  // ---- moving one node ----\n  for (const node of nodes) {\n    const head = node.querySelector('.am-panel-head');\n    if (!head) continue;\n    let moving = false;\n    let moveId = null;\n    let grab = null;\n    let start = null;\n\n    head.addEventListener('pointerdown', (e) => {\n      if (e.button !== 0) return;\n      // Keep the press away from the viewport's pan and from a fold toggle (the head is a summary on a canvas with folds).\n      e.stopPropagation();\n      moving = true;\n      moveId = e.pointerId;\n      start = { x: e.clientX, y: e.clientY };\n      const left = parseFloat(node.style.left) || 0;\n      const top = parseFloat(node.style.top) || 0;\n      grab = { dx: e.clientX - left * scale - x, dy: e.clientY - top * scale - y };\n      node.setAttribute('data-am-node-moving', '');\n      head.setPointerCapture?.(e.pointerId);\n    });\n    head.addEventListener('pointermove', (e) => {\n      if (!moving || e.pointerId !== moveId) return;\n      e.preventDefault();\n      // The node lives in stage units, the pointer in screen units: undo the pan and the zoom.\n      node.style.left = `${Math.round((e.clientX - grab.dx - x) / scale)}px`;\n      node.style.top = `${Math.round((e.clientY - grab.dy - y) / scale)}px`;\n      drawEdges();\n    });\n    const endMove = (e) => {\n      if (!moving || e.pointerId !== moveId) return;\n      moving = false;\n      moveId = null;\n      node.removeAttribute('data-am-node-moving');\n      try {\n        head.releasePointerCapture(e.pointerId);\n      } catch {}\n      saveArrangement();\n    };\n    head.addEventListener('pointerup', endMove);\n    head.addEventListener('pointercancel', endMove);\n\n    // The keyboard reaches the board too: focus a node's head and the arrow keys move it.\n    head.setAttribute('tabindex', '0');\n    head.addEventListener('keydown', (e) => {\n      const step = e.shiftKey ? 40 : 10;\n      const dx = e.key === 'ArrowLeft' ? -step : e.key === 'ArrowRight' ? step : 0;\n      const dy = e.key === 'ArrowUp' ? -step : e.key === 'ArrowDown' ? step : 0;\n      if (!dx && !dy) return;\n      e.preventDefault();\n      node.style.left = `${(parseFloat(node.style.left) || 0) + dx}px`;\n      node.style.top = `${(parseFloat(node.style.top) || 0) + dy}px`;\n      drawEdges();\n      saveArrangement();\n    });\n  }\n\n  // ---- the rest ----\n  html.setAttribute('data-canvas-live', '');\n\n  const fit = () => {\n    const r = viewport.getBoundingClientRect();\n    const w = stage.offsetWidth;\n    const h = stage.offsetHeight;\n    if (!w || !h) return;\n    const next = Math.max(MIN_SCALE, Math.min(1, Math.min((r.width - 32) / w, (r.height - 32) / h)));\n    scale = next;\n    x = (r.width - w * next) / 2;\n    y = (r.height - h * next) / 2;\n    apply();\n    saveArrangement();\n  };\n  const reset = () => {\n    try {\n      localStorage.removeItem(storeKey);\n    } catch {}\n    location.reload();\n  };\n\n  document.querySelector('[data-am=\"canvas-zoom-in\"]')?.addEventListener('click', () => {\n    const r = viewport.getBoundingClientRect();\n    zoomTo(scale * 1.2, r.width / 2, r.height / 2);\n    saveArrangement();\n  });\n  document.querySelector('[data-am=\"canvas-zoom-out\"]')?.addEventListener('click', () => {\n    const r = viewport.getBoundingClientRect();\n    zoomTo(scale / 1.2, r.width / 2, r.height / 2);\n    saveArrangement();\n  });\n  document.querySelector('[data-am=\"canvas-fit\"]')?.addEventListener('click', fit);\n  document.querySelector('[data-am=\"canvas-reset\"]')?.addEventListener('click', reset);\n\n  const saved = loadArrangement();\n  if (saved) {\n    for (const n of nodes) {\n      const at = saved.nodes[n.id];\n      if (!at) continue;\n      n.style.left = `${at.x}px`;\n      n.style.top = `${at.y}px`;\n    }\n    if (saved.view && Number.isFinite(saved.view.x) && Number.isFinite(saved.view.y) && Number.isFinite(saved.view.scale)) {\n      x = saved.view.x;\n      y = saved.view.y;\n      scale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, saved.view.scale));\n      apply();\n    }\n  } else {\n    fit();\n  }\n  drawEdges();\n  // The nodes' heights settle after the fonts arrive; the edges are drawn from the boxes, so they follow.\n  document.fonts?.ready.then(drawEdges);\n  addEventListener('resize', drawEdges);\n})();\n";
 var CLOSE_AFTER_CSS = "/* Countdown popover for a page made with close_after_reply (src/render.js adds this file only then). It sits at the bottom of the\n   window in the top layer and stays hidden unless open. */\n.am-closing { display: none; }\n.am-closing:popover-open {\n  display: flex; align-items: center; gap: 12px; position: fixed; inset-block: auto 20px; inset-inline: 0; margin-inline: auto; width: max-content; max-width: calc(100vw - 24px);\n  padding: 10px 14px; font-size: var(--am-fs-text); color: var(--ink); background: var(--paper);\n  border: 1px solid var(--line-2); border-radius: var(--radius); box-shadow: 0 12px 40px rgba(0,0,0,.25);\n}\n@media print {\n  .am-closing { display: none !important; }\n}\n";
 var CLOSE_AFTER_JS = `// Pages made with the close_after_reply setting only: src/render.js adds this script after the page script. When the reply is copied,
 // the reply sheet closes and a popover counts down to closing the tab. Browsers close only a tab no link has moved on, so a tab that
@@ -1389,6 +1391,7 @@ var zh_default = {
     scale: { down: "\u7F29\u5C0F\u6587\u5B57", up: "\u653E\u5927\u6587\u5B57" },
     move: "\u79FB\u52A8\u9762\u677F",
     resetOrder: "\u6062\u590D\u539F\u59CB\u987A\u5E8F",
+    canvas: { zoomIn: "\u653E\u5927", zoomOut: "\u7F29\u5C0F", fit: "\u9002\u914D", reset: "\u590D\u4F4D" },
     copy: "\u590D\u5236\u6E90\u7A3F",
     done: "\u5DF2\u590D\u5236 \u2713",
     copyCode: "\u590D\u5236",
@@ -1472,6 +1475,7 @@ var zh_Hant_default = {
     scale: { down: "\u7E2E\u5C0F\u6587\u5B57", up: "\u653E\u5927\u6587\u5B57" },
     move: "\u79FB\u52D5\u9762\u677F",
     resetOrder: "\u6062\u5FA9\u539F\u59CB\u9806\u5E8F",
+    canvas: { zoomIn: "\u653E\u5927", zoomOut: "\u7E2E\u5C0F", fit: "\u9069\u61C9", reset: "\u91CD\u8A2D" },
     copy: "\u8907\u88FD\u6E90\u7A3F",
     done: "\u5DF2\u8907\u88FD \u2713",
     copyCode: "\u8907\u88FD",
@@ -1549,6 +1553,7 @@ var en_default = {
     scale: { down: "Smaller text", up: "Larger text" },
     move: "Move panel",
     resetOrder: "Restore the original order",
+    canvas: { zoomIn: "Zoom in", zoomOut: "Zoom out", fit: "Fit", reset: "Reset" },
     copy: "Copy source",
     done: "Copied \u2713",
     copyCode: "Copy",
@@ -1632,6 +1637,7 @@ var ja_default = {
     scale: { down: "\u6587\u5B57\u3092\u5C0F\u3055\u304F", up: "\u6587\u5B57\u3092\u5927\u304D\u304F" },
     move: "\u30D1\u30CD\u30EB\u3092\u79FB\u52D5",
     resetOrder: "\u5143\u306E\u9806\u5E8F\u306B\u623B\u3059",
+    canvas: { zoomIn: "\u62E1\u5927", zoomOut: "\u7E2E\u5C0F", fit: "\u5168\u4F53\u8868\u793A", reset: "\u30EA\u30BB\u30C3\u30C8" },
     copy: "\u539F\u7A3F\u3092\u30B3\u30D4\u30FC",
     done: "\u30B3\u30D4\u30FC\u3057\u307E\u3057\u305F \u2713",
     copyCode: "\u30B3\u30D4\u30FC",
@@ -1713,6 +1719,7 @@ var he_default = {
     scale: { down: "\u05D4\u05E7\u05D8\u05E0\u05EA \u05D4\u05D8\u05E7\u05E1\u05D8", up: "\u05D4\u05D2\u05D3\u05DC\u05EA \u05D4\u05D8\u05E7\u05E1\u05D8" },
     move: "\u05D4\u05D6\u05D6\u05EA \u05E4\u05D0\u05E0\u05DC",
     resetOrder: "\u05E9\u05D7\u05D6\u05D5\u05E8 \u05D4\u05E1\u05D3\u05E8 \u05D4\u05DE\u05E7\u05D5\u05E8\u05D9",
+    canvas: { zoomIn: "\u05D4\u05D2\u05D3\u05DC\u05D4", zoomOut: "\u05D4\u05E7\u05D8\u05E0\u05D4", fit: "\u05D4\u05EA\u05D0\u05DE\u05D4", reset: "\u05D0\u05D9\u05E4\u05D5\u05E1" },
     copy: "\u05D4\u05E2\u05EA\u05E7\u05EA \u05D4\u05DE\u05E7\u05D5\u05E8",
     done: "\u05D4\u05D5\u05E2\u05EA\u05E7 \u2713",
     copyCode: "\u05D4\u05E2\u05EA\u05E7\u05D4",
@@ -2509,7 +2516,7 @@ function raiseAll(errors) {
   if (errors.length) throw new DraftErrors(errors);
 }
 var CHOICES = Object.freeze({
-  template: ["sheet", "doc", "video"],
+  template: ["sheet", "doc", "canvas", "video"],
   theme: [AUTO, ...themeNames("page")],
   style: ["off", "80", "strict"],
   mode: ["auto", "light", "dark"]
@@ -8741,8 +8748,133 @@ ${panels.map((p) => panelHtml(p, { grid: false, folds: meta.collapse === true, d
 </main>`;
 }
 
+// src/templates/canvas.js
+var NODE_W = 340;
+var NODE_MIN_H = 90;
+var estimateHeight = (panel) => {
+  const text2 = String(panel.html ?? "").replace(/<[^>]+>/g, " ");
+  return Math.max(NODE_MIN_H, 46 + Math.ceil(text2.trim().length / 55) * 22);
+};
+var EDGE_LINE = /^([A-Z][0-9]{0,2})\s*->\s*([A-Z][0-9]{0,2})\s*(?::\s*(.*))?$/;
+function parseCanvasEdges(text2, line = 1) {
+  const edges = [];
+  String(text2).split("\n").forEach((raw, i) => {
+    const s = raw.trim();
+    if (!s || s.startsWith("//")) return;
+    const m = s.match(EDGE_LINE);
+    if (!m) throw new CanvasEdgeError(`"${s}" is not an edge; write "A -> B" or "A -> B: label"`, line + i);
+    edges.push({ from: m[1], to: m[2], label: (m[3] ?? "").trim() });
+  });
+  return edges;
+}
+var CanvasEdgeError = class extends Error {
+  constructor(message, line) {
+    super(message);
+    this.name = "CanvasEdgeError";
+    this.line = line;
+  }
+};
+function edgePath(from, to) {
+  const dx = to.x + to.w / 2 - (from.x + from.w / 2);
+  const dy = to.y + to.h / 2 - (from.y + from.h / 2);
+  const rightward = dx >= 0;
+  const x1 = rightward ? from.x + from.w : from.x;
+  const x2 = rightward ? to.x : to.x + to.w;
+  const y1 = from.y + from.h / 2;
+  const y2 = to.y + to.h / 2;
+  const bend = Math.max(40, Math.min(140, Math.abs(x2 - x1) * 0.5)) * (rightward ? 1 : -1);
+  const lift = Math.abs(dx) < 30 ? Math.sign(dy || 1) * 0 : 0;
+  return `M${f(x1)},${f(y1)} C${f(x1 + bend)},${f(y1 + lift)} ${f(x2 - bend)},${f(y2 + lift)} ${f(x2)},${f(y2)}`;
+}
+function placePanels(panels, edges) {
+  const byId = new Map(panels.map((p) => [p.id, p]));
+  const fixed2 = new Set(panels.filter((p) => Number.isFinite(p.attrs?.x) && Number.isFinite(p.attrs?.y)).map((p) => p.id));
+  const free = panels.filter((p) => !fixed2.has(p.id));
+  const boxes = /* @__PURE__ */ new Map();
+  for (const id of fixed2) {
+    const p = byId.get(id);
+    boxes.set(id, { x: Number(p.attrs.x), y: Number(p.attrs.y), w: NODE_W, h: estimateHeight(p) });
+  }
+  if (free.length) {
+    const g = new $o.graphlib.Graph({ multigraph: true });
+    g.setGraph({ rankdir: "LR", nodesep: 40, ranksep: 90, marginx: 20, marginy: 20 });
+    g.setDefaultEdgeLabel(() => ({}));
+    for (const p of free) g.setNode(p.id, { width: NODE_W, height: estimateHeight(p) });
+    const freeIds = new Set(free.map((p) => p.id));
+    for (const e of edges) {
+      if (!freeIds.has(e.from) || !freeIds.has(e.to)) continue;
+      if (!byId.has(e.from) || !byId.has(e.to)) continue;
+      g.setEdge(e.from, e.to, {}, `${e.from}->${e.to}`);
+    }
+    for (const p of free) if (g.node(p.id) === void 0) g.setNode(p.id, { width: NODE_W, height: estimateHeight(p) });
+    $o.layout(g);
+    for (const p of free) {
+      const n = g.node(p.id);
+      if (!n) continue;
+      boxes.set(p.id, { x: n.x - NODE_W / 2, y: n.y - (n.height ?? NODE_MIN_H) / 2, w: NODE_W, h: n.height ?? NODE_MIN_H });
+    }
+  }
+  const shiftX = Math.min(0, ...boxes.size ? [...boxes.values()].map((box) => box.x) : [0]);
+  const shiftY = Math.min(0, ...boxes.size ? [...boxes.values()].map((box) => box.y) : [0]);
+  for (const box of boxes.values()) {
+    box.x -= shiftX;
+    box.y -= shiftY;
+  }
+  const width = Math.max(...[...boxes.values()].map((b) => b.x + b.w)) + 20;
+  const height = Math.max(...[...boxes.values()].map((b) => b.y + b.h)) + 20;
+  return { boxes, width, height };
+}
+function canvas({ meta, introHtml, panels, ui, language, edges = [] }) {
+  const known = new Set(panels.map((p) => p.id));
+  const dropped = edges.filter((e) => !known.has(e.from) || !known.has(e.to));
+  const kept = edges.filter((e) => known.has(e.from) && known.has(e.to));
+  const { boxes, width, height } = placePanels(panels, kept);
+  const uid = `c${Math.abs(hash(meta.title ?? "") % 1e5)}`;
+  const nodes = panels.map((p) => {
+    const b = boxes.get(p.id) ?? { x: 0, y: 0, w: NODE_W, h: NODE_MIN_H };
+    const html = panelHtml(p, { cols: 1, grid: false, folds: meta.collapse === true, drag: false, moveLabel: ui?.move });
+    return html.replace(
+      /^<section class="am-panel/,
+      `<section data-box="${f(b.x)} ${f(b.y)}" class="am-canvas-node am-panel`
+    ).replace(/>\n/, ` style="left:${f(b.x)}px;top:${f(b.y)}px;width:${f(b.w)}px">
+`);
+  }).join("\n");
+  const paths = kept.map((e) => {
+    const a = boxes.get(e.from);
+    const b = boxes.get(e.to);
+    if (!a || !b) return "";
+    const label = e.label ? `<text class="am-canvas-edge-label" x="${f((a.x + a.w + b.x) / 2)}" y="${f((a.y + a.h / 2 + b.y + b.h / 2) / 2)}" text-anchor="middle" dominant-baseline="central">${esc(e.label)}</text>` : "";
+    return `<g class="am-canvas-edge" data-from="panel-${esc(e.from)}" data-to="panel-${esc(e.to)}"><path d="${edgePath(a, b)}" marker-end="url(#${uid}-arrow)"/>${label}</g>`;
+  }).join("\n");
+  const c = ui?.canvas ?? {};
+  const zoomOut = c.zoomOut ?? "Zoom out";
+  const zoomIn = c.zoomIn ?? "Zoom in";
+  const fit = c.fit ?? "Fit";
+  const reset = c.reset ?? "Reset";
+  return `<main class="am-canvas" data-canvas>
+${headHtml(meta, introHtml, language)}
+<div class="am-canvas-viewport">
+<div class="am-canvas-stage" data-canvas-stage style="width:${Math.ceil(width)}px;height:${Math.ceil(height)}px">
+<svg class="am-canvas-edges" width="${Math.ceil(width)}" height="${Math.ceil(height)}" aria-hidden="true">${arrowDefs(uid)}
+${paths}
+</svg>
+<div class="am-canvas-zoom"><button class="am-btn" type="button" data-am="canvas-zoom-out" aria-label="${esc(zoomOut)}">\u2212</button><span class="am-btn" data-am="canvas-zoom-value">100%</span><button class="am-btn" type="button" data-am="canvas-zoom-in" aria-label="${esc(zoomIn)}">+</button><button class="am-btn" type="button" data-am="canvas-fit">${esc(fit)}</button><button class="am-btn" type="button" data-am="canvas-reset">${esc(reset)}</button></div>
+<div class="am-canvas-nodes">
+${nodes}
+</div>
+</div>
+</div>
+${dropped.length ? `<p class="am-canvas-dropped">${esc(dropped.map((e) => `${e.from} -> ${e.to}`).join(", "))}</p>` : ""}
+</main>`;
+}
+function hash(s) {
+  let h2 = 0;
+  for (let i = 0; i < String(s).length; i++) h2 = h2 * 31 + String(s).charCodeAt(i) | 0;
+  return h2;
+}
+
 // src/templates/index.js
-var TEMPLATES = { sheet, doc };
+var TEMPLATES = { sheet, doc, canvas };
 
 // src/themes/index.js
 var block = (selector, vars) => `${selector} {
@@ -8762,11 +8894,11 @@ var videoSel = (t) => `html[data-video][data-theme="${t.name}"]`;
 var scoped = (css, sel) => css.replace(/&/g, sel);
 var languageFontCss = () => fontLanguages().map((l3) => block(langSelector(l3, "html", "[data-theme][data-mode]"), { "--font-sans": l3.fonts.sans }));
 var ownLanguageFont = (t) => fontLanguages().map((l3) => block(langSelector(l3, "html", `[data-theme="${t.name}"][data-mode]`), { "--font-sans": t.tokens.common["--font-sans"] }));
-function pageCss(list2 = themes("page"), { diff = false, delta = false, rtl = false, math: math2 = false, chart = false, update: update2 = false, closeAfter = false, theme, scale = 1 } = {}) {
+function pageCss(list2 = themes("page"), { diff = false, delta = false, rtl = false, math: math2 = false, chart = false, canvas: canvas2 = false, update: update2 = false, closeAfter = false, theme, scale = 1 } = {}) {
   const decorations = list2.filter((t) => t.css).map((t) => scoped(t.css, pageSel(t)));
   const fontFace = FONT_CSS[list2.find((t) => t.name === theme)?.font];
   const ownFonts = list2.filter((t) => t.ownFont).flatMap(ownLanguageFont);
-  return [list2.map((t) => tokenCss(pageSel(t), t.tokens)).join("\n\n"), ...languageFontCss(), ...ownFonts, typeScaleCss(), ...scale === 1 ? [] : [`html { --am-scale: ${scale}; }`], BASE_CSS, ...math2 ? [MATH_CSS] : [], ...chart ? [CHART_CSS] : [], ...diff ? [DIFF_CSS] : [], ...delta ? [DELTA_CSS] : [], ...update2 ? [UPDATE_CSS] : [], ...closeAfter ? [CLOSE_AFTER_CSS] : [], ...rtl ? [RTL_CSS] : [], ...fontFace ? [fontFace] : [], ...decorations].join("\n\n");
+  return [list2.map((t) => tokenCss(pageSel(t), t.tokens)).join("\n\n"), ...languageFontCss(), ...ownFonts, typeScaleCss(), ...scale === 1 ? [] : [`html { --am-scale: ${scale}; }`], BASE_CSS, ...math2 ? [MATH_CSS] : [], ...chart ? [CHART_CSS] : [], ...canvas2 ? [CANVAS_CSS] : [], ...diff ? [DIFF_CSS] : [], ...delta ? [DELTA_CSS] : [], ...update2 ? [UPDATE_CSS] : [], ...closeAfter ? [CLOSE_AFTER_CSS] : [], ...rtl ? [RTL_CSS] : [], ...fontFace ? [fontFace] : [], ...decorations].join("\n\n");
 }
 function videoCss(list2 = themes("video"), { diff = false, delta = false, rtl = false, chart = false } = {}) {
   const parts = list2.filter((t) => t.video).flatMap((t) => [
@@ -9615,10 +9747,23 @@ function renderDoc(source, overrides = {}, defaults2 = {}, { themes: themes2 = B
   for (const b of loose) {
     errors.push(new RenderError(`${b.lang} belongs in a panel: put it under the ## heading of the panel the answer changes`, { line: b.line, component: b.lang, example: COMPONENTS.get(b.lang).example }));
   }
-  const introHtml = renderBlocks(doc2.intro.filter((b) => !loose.includes(b)), ctx);
+  const canvasFence = doc2.meta.template === "canvas" ? doc2.intro.find((b) => b.type === "fence" && b.lang === "canvas") : null;
+  if (doc2.meta.template === "canvas" && !canvasFence) {
+    throw new ParseError('a canvas page needs its edges: put a canvas fence with "A -> B" lines in the intro, before the panels', 0);
+  }
+  let canvasEdges = [];
+  if (canvasFence) {
+    try {
+      canvasEdges = parseCanvasEdges(canvasFence.text, canvasFence.line);
+    } catch (e) {
+      if (e instanceof CanvasEdgeError) throw new ParseError(e.message, e.line);
+      throw e;
+    }
+  }
+  const introHtml = renderBlocks(doc2.intro.filter((b) => b !== canvasFence && !loose.includes(b)), ctx);
   const panels = doc2.panels.map((p) => ({ ...p, html: renderBlocks(p.blocks, ctx) }));
   raiseAll(errors);
-  const page = TEMPLATES[doc2.meta.template]({ meta: doc2.meta, introHtml, panels, ui, language });
+  const page = TEMPLATES[doc2.meta.template]({ meta: doc2.meta, introHtml, panels, ui, language, edges: canvasEdges });
   const body = language.dir === "rtl" ? isolateLtrRuns(page) : page;
   const html = shell({ meta: doc2.meta, language, body, source, embedded: themes2.embedFor(doc2.meta.theme, "page"), update: update2, closeAfter, scale });
   return { html, warnings, stats, meta: doc2.meta, language };
@@ -9801,7 +9946,7 @@ function shell({ meta, language, body, source, embedded, update: update2, closeA
   const pick = (name, label, values, current) => `<label class="am-pick">${esc(label)}<select data-am="${name}">${values.map(([value, text2]) => `<option value="${esc(value)}"${value === current ? " selected" : ""}>${esc(text2)}</option>`).join("")}</select></label>`;
   const root = { lang: language.htmlLang, dir: language.dir, theme: meta.theme, mode: meta.mode, style: meta.style, scale };
   const script = `
-${RUNTIME_JS}${hasDelta(body) ? DELTA_JS : ""}${update2 ? UPDATE_JS : ""}${closeAfter ? CLOSE_AFTER_JS : ""}`;
+${RUNTIME_JS}${meta.template === "canvas" ? CANVAS_JS : ""}${hasDelta(body) ? DELTA_JS : ""}${update2 ? UPDATE_JS : ""}${closeAfter ? CLOSE_AFTER_JS : ""}`;
   return `<!doctype html>
 ${rootTag(root)}
 <head>
@@ -9811,7 +9956,7 @@ ${cspMeta([script], { live: true })}
 <meta name="generator" content="Answer me with HTML ${VERSION}">
 <title>${esc(meta.title || "Answer me with HTML")}</title>
 <style>
-${pageCss(embedded, { diff: body.includes('class="am-codeblock am-codeblock--diff"'), delta: hasDelta(body), rtl: language.dir === "rtl", math: hasMath(body), chart: hasChart(body), update: Boolean(update2), closeAfter, theme: meta.theme, scale })}
+${pageCss(embedded, { diff: body.includes('class="am-codeblock am-codeblock--diff"'), delta: hasDelta(body), rtl: language.dir === "rtl", math: hasMath(body), chart: hasChart(body), canvas: meta.template === "canvas", update: Boolean(update2), closeAfter, theme: meta.theme, scale })}
 </style>
 </head>
 <body>
@@ -10085,13 +10230,13 @@ async function download(url, maxBytes, { fetchImpl = fetch, timeoutMs = CATALOG.
 }
 function entryFrom(raw) {
   if (!raw || typeof raw !== "object") return null;
-  const { name, version, requires, size, sha256: hash } = raw;
+  const { name, version, requires, size, sha256: hash2 } = raw;
   if (typeof name !== "string" || !NAME.test(name) || name.length > CATALOG.maxNameLength || BUILTIN_NAMES.includes(name)) return null;
   if (typeof version !== "string" || !XYZ.test(version)) return null;
   if (requires !== void 0 && (typeof requires !== "string" || !XYZ.test(requires))) return null;
   if (!Number.isInteger(size) || size <= 0 || size > CATALOG.maxThemeBytes) return null;
-  if (typeof hash !== "string" || !SHA256.test(hash)) return null;
-  return { name, version, size, sha256: hash, ...requires && { requires } };
+  if (typeof hash2 !== "string" || !SHA256.test(hash2)) return null;
+  return { name, version, size, sha256: hash2, ...requires && { requires } };
 }
 async function fetchIndex(env = process.env, net = {}) {
   const url = catalogUrl(env);
@@ -12044,7 +12189,9 @@ Usage:
 var FORMAT = `Draft format (extended Markdown)
 
 ---
-template: sheet        # sheet: blueprint board (default, multi-panel grid) | doc: linear explainer (one column + contents)
+template: sheet        # sheet: board (default, justified grid) | doc: linear explainer (one column + contents)
+                       # canvas: an infinite board of panels that the reader pans, zooms and drags; the edges come from
+                       #         a canvas fence in the intro (before the first panel): A -> B or A -> B: label
 theme: auto            # auto (default): paper for the doc template or text only, blueprint with diagrams | blueprint | shadcn | paper; switchable in the page
 title: Page title      # or use "# Title" as the first line of the body
 subtitle: Subtitle     # optional
@@ -12059,6 +12206,7 @@ Intro (optional, shown below the title)
 
 ## A Panel title {span=2 meta="top-right note" collapse collapsed}
 {span=2} wide hint; {bare} no title bar; {collapse} this panel folds even when the page does not; {collapsed} it starts folded.
+On a canvas page {x=120 y=40} pins a panel to that spot; panels without it are placed along the edges.
 Plain Markdown: paragraphs, lists, tables, quotes, inline code...
 Write ok / no / warn in a table cell (text may follow, e.g. "ok approved") to get a \u2713 / \u2717 / ! badge.
 

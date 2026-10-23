@@ -4,13 +4,14 @@ import { parseDocLoose, ParseError, raiseAll, applyOverrides, CHOICES } from './
 import { md, collectHtmlNotes } from './markdown.js';
 import { COMPONENTS, RAW_LANGS, ComponentError } from './components/index.js';
 import { TEMPLATES } from './templates/index.js';
+import { parseCanvasEdges, CanvasEdgeError } from './templates/canvas.js';
 import { pageCss } from './themes/index.js';
 import { BUILTIN, AUTO, pickTheme } from './themes/registry.js';
 import { lintDoc } from './lint/ste.js';
 import { esc } from './svg/text.js';
 import { scaleSvgBoxes } from './svg/shapes.js';
 import { SCALE } from './themes/type-scale.js';
-import { VERSION, RUNTIME_JS, DELTA_JS, UPDATE_JS, CLOSE_AFTER_JS } from './assets.js';
+import { VERSION, RUNTIME_JS, DELTA_JS, UPDATE_JS, CLOSE_AFTER_JS, CANVAS_JS } from './assets.js';
 import { rootTag, rootCarrierAttrs, sourceTag } from './page.js';
 import { resolveLanguage } from './language.js';
 import { inlineImages, remoteImages, ImageError, IMAGE_EXAMPLE } from './images.js';
@@ -70,10 +71,28 @@ export function renderDoc(source, overrides = {}, defaults = {}, { themes = BUIL
   for (const b of loose) {
     errors.push(new RenderError(`${b.lang} belongs in a panel: put it under the ## heading of the panel the answer changes`, { line: b.line, component: b.lang, example: COMPONENTS.get(b.lang).example }));
   }
-  const introHtml = renderBlocks(doc.intro.filter((b) => !loose.includes(b)), ctx);
+  // A canvas page takes its edges from a canvas fence in the intro: the edges name the panels themselves, so the fence sits
+  // before the first panel and never inside one.
+  const canvasFence = doc.meta.template === 'canvas'
+    ? doc.intro.find((b) => b.type === 'fence' && b.lang === 'canvas')
+    : null;
+  if (doc.meta.template === 'canvas' && !canvasFence) {
+    throw new ParseError('a canvas page needs its edges: put a canvas fence with "A -> B" lines in the intro, before the panels', 0);
+  }
+  let canvasEdges = [];
+  if (canvasFence) {
+    try {
+      canvasEdges = parseCanvasEdges(canvasFence.text, canvasFence.line);
+    } catch (e) {
+      // A bad edge line names its own line in the draft, like every other draft error.
+      if (e instanceof CanvasEdgeError) throw new ParseError(e.message, e.line);
+      throw e;
+    }
+  }
+  const introHtml = renderBlocks(doc.intro.filter((b) => b !== canvasFence && !loose.includes(b)), ctx);
   const panels = doc.panels.map((p) => ({ ...p, html: renderBlocks(p.blocks, ctx) }));
   raiseAll(errors);
-  const page = TEMPLATES[doc.meta.template]({ meta: doc.meta, introHtml, panels, ui, language });
+  const page = TEMPLATES[doc.meta.template]({ meta: doc.meta, introHtml, panels, ui, language, edges: canvasEdges });
   // A right-to-left page isolates each run of text with no right-to-left letter as left to right (src/bidi.js).
   const body = language.dir === 'rtl' ? isolateLtrRuns(page) : page;
   const html = shell({ meta: doc.meta, language, body, source, embedded: themes.embedFor(doc.meta.theme, 'page'), update, closeAfter, scale });
@@ -310,7 +329,7 @@ function shell({ meta, language, body, source, embedded, update, closeAfter, sca
     .map(([value, text]) => `<option value="${esc(value)}"${value === current ? ' selected' : ''}>${esc(text)}</option>`).join('')}</select></label>`;
   const root = { lang: language.htmlLang, dir: language.dir, theme: meta.theme, mode: meta.mode, style: meta.style, scale };
   // The one inline script, as the browser reads it: the policy pins a hash of exactly this text.
-  const script = `\n${RUNTIME_JS}${hasDelta(body) ? DELTA_JS : ''}${update ? UPDATE_JS : ''}${closeAfter ? CLOSE_AFTER_JS : ''}`;
+  const script = `\n${RUNTIME_JS}${meta.template === 'canvas' ? CANVAS_JS : ''}${hasDelta(body) ? DELTA_JS : ''}${update ? UPDATE_JS : ''}${closeAfter ? CLOSE_AFTER_JS : ''}`;
   return `<!doctype html>
 ${rootTag(root)}
 <head>
@@ -320,7 +339,7 @@ ${cspMeta([script], { live: true })}
 <meta name="generator" content="Answer me with HTML ${VERSION}">
 <title>${esc(meta.title || 'Answer me with HTML')}</title>
 <style>
-${pageCss(embedded, { diff: body.includes('class="am-codeblock am-codeblock--diff"'), delta: hasDelta(body), rtl: language.dir === 'rtl', math: hasMath(body), chart: hasChart(body), update: Boolean(update), closeAfter, theme: meta.theme, scale })}
+${pageCss(embedded, { diff: body.includes('class="am-codeblock am-codeblock--diff"'), delta: hasDelta(body), rtl: language.dir === 'rtl', math: hasMath(body), chart: hasChart(body), canvas: meta.template === 'canvas', update: Boolean(update), closeAfter, theme: meta.theme, scale })}
 </style>
 </head>
 <body>

@@ -1,4 +1,4 @@
-// The sheet page script: math-text.js around everything, then page.js, then the reply script with replyText, replyViewHtml (and the RTL_LETTER it reads) and remarkText, then the remark script, then the fold script, then the drag script, then the layout planner and its DOM adapter.
+// The sheet page script: math-text.js around everything, then page.js, then the reply script with replyText, replyViewHtml (and the RTL_LETTER it reads) and remarkText, then the remark script, then the fold script, then the drag script, then the canvas script, then the layout planner and its DOM adapter.
 // The fold script comes before the adapter on purpose: it restores the reader's folded panels, and the adapter measures the page at its own load.
 // replyText, replyViewHtml, remarkText, the math text helpers and planLayout are plain ES modules for tests; the page gets them with their `export` keyword dropped.
 // src/assets.js (development) and scripts/build.mjs (bundle) both call this with their own file reader, so the two cannot drift apart.

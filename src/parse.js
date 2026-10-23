@@ -29,7 +29,7 @@ export function raiseAll(errors) {
 }
 
 export const CHOICES = Object.freeze({
-  template: ['sheet', 'doc', 'video'],
+  template: ['sheet', 'doc', 'canvas', 'video'],
   theme: [AUTO, ...themeNames('page')],
   style: ['off', '80', 'strict'],
   mode: ['auto', 'light', 'dark'],
