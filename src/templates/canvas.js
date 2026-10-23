@@ -14,6 +14,7 @@ import { arrowDefs, f } from '../svg/shapes.js';
 
 // Node width: wide enough for a sentence of prose or a small diagram, narrow enough that four columns fit a laptop screen.
 const NODE_W = 340;
+const NODE_W_MAX = 900;
 const NODE_MIN_H = 90;
 // How tall a panel most likely is, before a browser measures it: a title bar plus a line per ~55 characters of text. Only the
 // first spread of the board depends on it; a reader who drags a node owns the position from then on.
@@ -65,7 +66,16 @@ function edgePath(from, to) {
 }
 
 // Lay the panels out. `placed` returns, for each panel, its box in stage coordinates.
-export function placePanels(panels, edges) {
+// {w=520} widens a node: a table or a diagram needs the room, and a board of prose does not.
+const widthOf = (panel) => {
+  const w = Number(panel.attrs?.w);
+  return Number.isFinite(w) && w >= 240 ? Math.min(w, NODE_W_MAX) : NODE_W;
+};
+
+const DIRECTIONS = new Set(['LR', 'RL', 'TB', 'BT']);
+
+export function placePanels(panels, edges, direction = 'LR') {
+  const rankdir = DIRECTIONS.has(String(direction).toUpperCase()) ? String(direction).toUpperCase() : 'LR';
   const byId = new Map(panels.map((p) => [p.id, p]));
   // A panel with both coordinates keeps them; the rest go through dagre.
   const fixed = new Set(panels.filter((p) => Number.isFinite(p.attrs?.x) && Number.isFinite(p.attrs?.y)).map((p) => p.id));
@@ -73,13 +83,13 @@ export function placePanels(panels, edges) {
   const boxes = new Map();
   for (const id of fixed) {
     const p = byId.get(id);
-    boxes.set(id, { x: Number(p.attrs.x), y: Number(p.attrs.y), w: NODE_W, h: estimateHeight(p) });
+    boxes.set(id, { x: Number(p.attrs.x), y: Number(p.attrs.y), w: widthOf(p), h: estimateHeight(p) });
   }
   if (free.length) {
     const g = new dagre.graphlib.Graph({ multigraph: true });
-    g.setGraph({ rankdir: 'LR', nodesep: 40, ranksep: 90, marginx: 20, marginy: 20 });
+    g.setGraph({ rankdir, nodesep: 40, ranksep: 90, marginx: 20, marginy: 20 });
     g.setDefaultEdgeLabel(() => ({}));
-    for (const p of free) g.setNode(p.id, { width: NODE_W, height: estimateHeight(p) });
+    for (const p of free) g.setNode(p.id, { width: widthOf(p), height: estimateHeight(p) });
     // Only edges between two free panels shape the spread: a fixed panel already has its place.
     const freeIds = new Set(free.map((p) => p.id));
     for (const e of edges) {
@@ -88,12 +98,13 @@ export function placePanels(panels, edges) {
       g.setEdge(e.from, e.to, {}, `${e.from}->${e.to}`);
     }
     // A panel no edge reaches is not in dagre's graph; give it a node of its own so it still gets a place.
-    for (const p of free) if (g.node(p.id) === undefined) g.setNode(p.id, { width: NODE_W, height: estimateHeight(p) });
+    for (const p of free) if (g.node(p.id) === undefined) g.setNode(p.id, { width: widthOf(p), height: estimateHeight(p) });
     dagre.layout(g);
     for (const p of free) {
       const n = g.node(p.id);
       if (!n) continue;
-      boxes.set(p.id, { x: n.x - NODE_W / 2, y: n.y - (n.height ?? NODE_MIN_H) / 2, w: NODE_W, h: n.height ?? NODE_MIN_H });
+      const w = widthOf(p);
+      boxes.set(p.id, { x: n.x - w / 2, y: n.y - (n.height ?? NODE_MIN_H) / 2, w, h: n.height ?? NODE_MIN_H });
     }
   }
   // A negative coordinate would be clipped by the stage, so the board is moved into view; coordinates an author wrote keep
@@ -114,7 +125,8 @@ export function canvas({ meta, introHtml, panels, ui, language, edges = [] }) {
   const known = new Set(panels.map((p) => p.id));
   const dropped = edges.filter((e) => !known.has(e.from) || !known.has(e.to));
   const kept = edges.filter((e) => known.has(e.from) && known.has(e.to));
-  const { boxes, width, height } = placePanels(panels, kept);
+  // direction: LR (left to right, the default) | TB (top to bottom, better for a long chain of panels).
+  const { boxes, width, height } = placePanels(panels, kept, meta.dir ?? meta.direction);
   const uid = `c${Math.abs(hash(meta.title ?? '') % 100000)}`;
 
   const nodes = panels

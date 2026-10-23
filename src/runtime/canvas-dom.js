@@ -17,7 +17,9 @@
   const RENDERED = ids().map((id) => id);
   const storeKey = `am-canvas:${location.pathname}:${RENDERED.join(',')}`;
 
-  const MIN_SCALE = 0.25;
+  const MIN_SCALE = 0.1;
+  // fit() may go below the zoom range: a long board is shown whole first, and the reader zooms in from there.
+  const FIT_MIN = 0.05;
   const MAX_SCALE = 2.5;
 
   let scale = 1;
@@ -213,7 +215,7 @@
     const w = stage.offsetWidth;
     const h = stage.offsetHeight;
     if (!w || !h) return;
-    const next = Math.max(MIN_SCALE, Math.min(1, Math.min((r.width - 32) / w, (r.height - 32) / h)));
+    const next = Math.max(FIT_MIN, Math.min(1, Math.min((r.width - 32) / w, (r.height - 32) / h)));
     scale = next;
     x = (r.width - w * next) / 2;
     y = (r.height - h * next) / 2;
