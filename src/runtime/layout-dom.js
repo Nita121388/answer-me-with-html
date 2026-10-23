@@ -6,9 +6,11 @@
 // shows (the planned widths belong to the screen width, so print never gets a mix of the two); after printing the layout comes back.
 
 const grid = document.querySelector('.am-grid');
-const panels = grid ? [...grid.children].filter((el) => el.classList.contains('am-panel')) : [];
+// The panel list is read again on every pass: a reader can reorder the panels (src/runtime/drag.js) without this file being reloaded.
+// A panel sits either in the grid or in an .am-col box that apply() made, so the list is a query and not grid.children.
+const panelList = () => (grid ? [...grid.querySelectorAll('.am-panel')] : []);
 
-if (panels.length > 1) {
+if (panelList().length > 1) {
   const SINGLE_COLUMN = '(max-width: 760px)'; // the single-column breakpoint in src/themes/base.css
   const TWO_COLUMNS = '(max-width: 1100px)'; // below this the CSS grid has two columns
   const SAMPLE_STEP = 20; // width sampling step, px; the planner interpolates between samples
@@ -26,15 +28,25 @@ if (panels.length > 1) {
   const OVERFLOWING = '.am-table-wrap, .am-diagram, .am-annot-scroll, pre';
 
   // The first-row cells of each table carry the column widths fitTables() sets, so restore() resets them too.
-  const tables = [...grid.querySelectorAll('.am-table-wrap > table')];
-  const headCells = (table) => [...(table.rows[0]?.cells ?? [])];
-  const original = new Map([grid, ...panels, ...grid.querySelectorAll('.am-diagram > svg'), ...tables.flatMap(headCells)].map((el) => [el, el.getAttribute('style')]));
-  const restoreStyle = (el) => (original.get(el) === null ? el.removeAttribute('style') : el.setAttribute('style', original.get(el)));
+  const headCells = (table) => [...(table?.rows[0]?.cells ?? [])];
+  // The style each element had before this script first wrote to it. The snapshot is taken after restore(), when every element
+  // carries its rendered style again, so an element first seen on a later pass is captured then and not with a written style.
+  const original = new Map();
+  const styled = () => [grid, ...panelList(), ...grid.querySelectorAll('.am-diagram > svg'), ...grid.querySelectorAll('.am-table-wrap > table').flatMap(headCells)];
+  const snapshot = () => {
+    for (const el of styled()) if (!original.has(el)) original.set(el, el.getAttribute('style'));
+  };
+  const restoreStyle = (el) => {
+    if (!original.has(el)) return;
+    const saved = original.get(el);
+    if (saved === null) el.removeAttribute('style');
+    else el.setAttribute('style', saved);
+  };
 
   // Back to the plain grid markup and styles.
   const restore = () => {
     for (const box of grid.querySelectorAll(':scope > .am-col')) box.replaceWith(...box.children);
-    for (const el of original.keys()) restoreStyle(el);
+    for (const el of styled()) restoreStyle(el);
   };
 
   // The author's width hint, rendered as data-span only when the author wrote one. The inline grid-column is the no-JavaScript fallback
@@ -81,10 +93,10 @@ if (panels.length > 1) {
 
   // Height (and, for panels with tables or code, the narrowest width without sideways scrolling) at sampled widths.
   // Only one panel is displayed while it is measured, so each width change lays out that panel alone.
-  function measure(width) {
+  function measure(list, width) {
     const scale = pageScale();
     grid.style.display = 'block';
-    for (const el of panels) {
+    for (const el of list) {
       el.style.display = 'none';
       el.style.boxSizing = 'border-box';
       for (const svg of el.querySelectorAll('.am-diagram > svg')) {
@@ -92,7 +104,7 @@ if (panels.length > 1) {
         svg.style.maxWidth = `${naturalWidth(svg) * MAX_SCALE}px`;
       }
     }
-    const info = panels.map((el) => {
+    const info = list.map((el) => {
       const svg = diagramOnly(el);
       const svgs = [...el.querySelectorAll('.am-diagram > svg')];
       const scrollers = el.querySelectorAll(OVERFLOWING);
@@ -126,7 +138,7 @@ if (panels.length > 1) {
         span: spanHint(el),
       };
     });
-    for (const el of panels) {
+    for (const el of list) {
       el.style.display = '';
       el.style.width = '';
     }
@@ -135,12 +147,12 @@ if (panels.length > 1) {
 
   // Each column gets a fixed width. A row adds up to the full width, so flex-wrap breaks rows by itself.
   // Stacked panels go into a column wrapper whose last panel absorbs the extra height.
-  function apply(plan, gap) {
+  function apply(list, plan, gap) {
     grid.style.display = 'flex';
     grid.style.flexWrap = 'wrap';
     grid.style.alignItems = 'stretch';
     grid.style.gap = `${gap}px`;
-    for (const el of panels) {
+    for (const el of list) {
       el.style.gridColumn = '';
       el.style.gridRow = '';
       el.style.flex = '0 0 auto';
@@ -149,25 +161,25 @@ if (panels.length > 1) {
       for (const col of row.columns) {
         const width = `${col.width}px`;
         if (col.panels.length === 1) {
-          panels[col.panels[0]].style.width = width;
+          list[col.panels[0]].style.width = width;
           continue;
         }
         const box = document.createElement('div');
         box.className = 'am-col';
         box.style.cssText = `width:${width};flex:0 0 auto;display:flex;flex-direction:column;gap:${gap}px`;
-        panels[col.panels[0]].before(box);
+        list[col.panels[0]].before(box);
         for (const k of col.panels) {
-          panels[k].style.width = '';
-          box.append(panels[k]);
+          list[k].style.width = '';
+          box.append(list[k]);
         }
-        panels[col.panels[col.panels.length - 1]].style.flex = '1 1 auto';
+        list[col.panels[col.panels.length - 1]].style.flex = '1 1 auto';
       }
     }
   }
 
   // Diagram-only panels show their diagram at most at the top of the page's scale band; a wider panel gains empty space instead.
-  function capDiagrams(maxScale) {
-    for (const el of panels) {
+  function capDiagrams(list, maxScale) {
+    for (const el of list) {
       const svg = diagramOnly(el);
       if (svg) svg.style.maxWidth = `${naturalWidth(svg) * maxScale}px`;
     }
@@ -175,8 +187,13 @@ if (panels.length > 1) {
 
   const containerWidth = () => Math.floor(grid.getBoundingClientRect().width);
 
+  // Said once after every pass, with whether a plan is in place. Anything that draws against the panels listens to it:
+  // the fold chevrons and the connection layer (src/runtime/fold.js, src/runtime/links.js).
+  const announce = (applied) => document.dispatchEvent(new CustomEvent('am-layout', { detail: { applied } }));
+
   function justify() {
     if (printing || printQuery.matches) return;
+    let applied = false;
     try {
       // A vertical scrollbar can appear or vanish once the rows change height; plan again if the width moved.
       let planned = -1;
@@ -184,17 +201,27 @@ if (panels.length > 1) {
         restore();
         if (matchMedia(SINGLE_COLUMN).matches) return;
         planned = containerWidth();
+        // Every element is unstyled again after restore(), so this is where a panel first seen on this pass is captured.
+        snapshot();
+        const list = panelList();
         const gap = parseFloat(getComputedStyle(grid).columnGap) || 0;
         const cols = Math.max(1, Number(getComputedStyle(grid).getPropertyValue('--cols')) || 3);
-        const plan = planLayout({ width: planned, gap, cols: matchMedia(TWO_COLUMNS).matches ? Math.min(cols, 2) : cols, panels: measure(planned) });
-        apply(plan, gap);
-        capDiagrams(plan.maxScale);
+        const plan = planLayout({ width: planned, gap, cols: matchMedia(TWO_COLUMNS).matches ? Math.min(cols, 2) : cols, panels: measure(list, planned) });
+        apply(list, plan, gap);
+        capDiagrams(list, plan.maxScale);
         fitTables();
+        applied = true;
       }
       // The width never settled: columns planned for another width would overflow or leave gaps, so show the plain grid.
-      if (planned !== containerWidth()) restore();
+      if (planned !== containerWidth()) {
+        restore();
+        applied = false;
+      }
     } catch {
       restore();
+      applied = false;
+    } finally {
+      announce(applied);
     }
   }
 
@@ -211,6 +238,7 @@ if (panels.length > 1) {
   const toPrint = () => {
     clearTimeout(timer);
     restore();
+    announce(false);
   };
   justify();
   addEventListener('resize', later);
