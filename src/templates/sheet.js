@@ -45,7 +45,7 @@ export function minSpan(panel) {
   return Math.max(1, byTable, byDiagram);
 }
 
-export function sheet({ meta, introHtml, panels, language }) {
+export function sheet({ meta, introHtml, panels, ui, language }) {
   const cols = Math.max(1, Math.min(Number(meta.cols) || 3, 12));
   const sized = panels.map((p) => (p.attrs.span === undefined && minSpan(p) > 1
     ? { ...p, attrs: { ...p.attrs, span: Math.min(minSpan(p), cols) } }
@@ -59,7 +59,7 @@ ${headHtml(meta, introHtml, language)}
 <div class="am-frame">
 ${ruler('top', nums)}${ruler('bottom', nums)}${ruler('left', letters)}${ruler('right', letters)}
 <div class="am-grid" style="--cols: ${cols}">
-${placed.map((p, i) => panelHtml(p, { cols, hints: { span: panels[i].attrs.span }, folds: meta.collapse === true })).join('\n')}
+${placed.map((p, i) => panelHtml(p, { cols, hints: { span: panels[i].attrs.span }, folds: meta.collapse === true, drag: meta.drag === true, moveLabel: ui?.move })).join('\n')}
 </div>
 </div>
 </main>`;

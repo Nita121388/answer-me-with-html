@@ -75,6 +75,13 @@ const state = () => evaluate(`JSON.stringify([...document.querySelectorAll('.am-
   id: p.id,
   fold: !!p.querySelector('.am-fold'),
   open: p.querySelector('.am-fold')?.open ?? null,
+  // Chrome hides a closed details' content with content-visibility, so the body still reports a layout box; the details' own
+  // height is what shows it: a closed fold is exactly its summary.
+  body: (() => {
+    const d = p.querySelector('.am-fold');
+    if (!d) return true;
+    return d.offsetHeight > (d.querySelector('summary')?.offsetHeight ?? 0) + 1;
+  })(),
   h: Math.round(p.getBoundingClientRect().height),
 })))`).then(JSON.parse);
 
@@ -112,7 +119,13 @@ after(async () => {
       chrome.kill();
     });
   }
-  if (tmp) rmSync(tmp, { recursive: true, force: true });
+  try {
+    if (tmp) rmSync(tmp, { recursive: true, force: true, maxRetries: 3, retryDelay: 200 });
+  } catch (e) {
+    // Chrome helper processes can still write to the profile after the main process exits (#74).
+    // A leftover temp directory is not a test failure.
+    console.warn(`Could not remove ${tmp}: ${e.message}`);
+  }
 });
 
 test('fold: page-level collapse makes every panel a fold, and {collapsed} starts one closed', { skip: SKIP, timeout: 60000 }, async () => {
@@ -121,25 +134,32 @@ test('fold: page-level collapse makes every panel a fold, and {collapsed} starts
   assert.deepEqual(panels.map((p) => p.id), ['panel-A', 'panel-B', 'panel-C']);
   assert.deepEqual(panels.map((p) => p.fold), [true, true, true], 'every panel is a fold');
   assert.deepEqual(panels.map((p) => p.open), [true, false, true], 'B starts folded, A and C start open');
-  assert.ok(panels[1].h < panels[0].h, 'a folded panel is shorter than an open one');
+  // The sheet stretches every panel of a row to the row's height, so the panel box does not get shorter; the body is what goes away.
+  assert.deepEqual(panels.map((p) => p.body), [true, false, true], 'only the folded panel hides its body');
 });
 
 test('fold: a click on the head folds and unfolds, and the sheet plans its rows again', { skip: SKIP, timeout: 60000 }, async () => {
   await open(files.fold);
-  const before = await state();
-  const closedHeight = before.find((p) => p.id === 'panel-A').h;
+  // Count the layout passes the page makes: a fold changes a row's height, so the sheet must plan again.
+  const watch = `window.__amLayouts = 0; document.addEventListener('am-layout', () => { window.__amLayouts++; }); true`;
+  await evaluate(watch);
 
   await evaluate(`document.querySelector('#panel-A > .am-fold > summary').click()`);
   await new Promise((r) => setTimeout(r, LAYOUT_WAIT_MS));
   const folded = await state();
   assert.equal(folded.find((p) => p.id === 'panel-A').open, false, 'A is folded after the click');
-  assert.ok(folded.find((p) => p.id === 'panel-A').h < closedHeight, 'the folded panel got shorter');
+  assert.equal(folded.find((p) => p.id === 'panel-A').body, false, 'the folded body is hidden');
+  assert.ok(await evaluate('window.__amLayouts') > 0, 'the sheet planned its rows again after the fold');
 
+  await evaluate(watch);
   await evaluate(`document.querySelector('#panel-A > .am-fold > summary').click()`);
   await new Promise((r) => setTimeout(r, LAYOUT_WAIT_MS));
   const reopened = await state();
   assert.equal(reopened.find((p) => p.id === 'panel-A').open, true, 'A is open again');
-  assert.ok(reopened.find((p) => p.id === 'panel-A').h >= closedHeight - 1, 'the open panel got its height back');
+  assert.equal(reopened.find((p) => p.id === 'panel-A').body, true, 'the body is back');
+  assert.ok(await evaluate('window.__amLayouts') > 0, 'the sheet planned again after the unfold');
+  // The sheet is still the justified layout, not the plain CSS grid: the fold did not knock the planner out.
+  assert.equal(await evaluate(`getComputedStyle(document.querySelector('.am-grid')).display`), 'flex');
 });
 
 test('fold: the reader choice survives a reload', { skip: SKIP, timeout: 60000 }, async () => {

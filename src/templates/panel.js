@@ -7,7 +7,7 @@ import { hasRtl } from '../bidi.js';
 // A fold is a native <details>: the panel opens and closes with no script, works from the keyboard alone, and prints open.
 // `folds` is the page-level setting (`folds: true` in the frontmatter); a panel opts out with {collapse=false}.
 // The comment button (added by src/runtime/reply.js) hangs on the <section>, outside the details, so a click on it never folds.
-export function panelHtml(panel, { cols = 3, grid = true, hints = {}, folds = false } = {}) {
+export function panelHtml(panel, { cols = 3, grid = true, hints = {}, folds = false, drag = false, moveLabel = 'Move panel' } = {}) {
   const { attrs } = panel;
   const span = Math.min(Number(attrs.span) || 1, cols);
   const rows = Number(attrs.rows) || 1;
@@ -21,9 +21,14 @@ export function panelHtml(panel, { cols = 3, grid = true, hints = {}, folds = fa
   const fold = folds ? attrs.collapse !== false : attrs.collapse === true;
   const cls = `${span > 1 ? ' am-span-wide' : ''}${attrs.bare ? ' am-panel--bare' : ''}${fold && !attrs.bare ? ' am-panel--fold' : ''}`;
   const meta = attrs.meta ? `<span class="am-panel-meta">${esc(attrs.meta)}</span>` : '';
+  // The grip is a button so the keyboard reaches it; src/runtime/drag.js moves the panel from it. It sits inside <summary>
+  // on a folded panel, so its click must not fold the panel: drag.js calls preventDefault() on pointerdown and click.
+  const grip = drag && !attrs.bare
+    ? `<button class="am-grip" type="button" data-am="grip" aria-label="${esc(`${moveLabel} ${panel.id}`)}" title="${esc(moveLabel)}"></button>`
+    : '';
   const head = attrs.bare
     ? ''
-    : `<span class="am-panel-id">${esc(panel.id)}</span><h2>${esc(panel.title)}</h2>${meta}`;
+    : `${grip}<span class="am-panel-id">${esc(panel.id)}</span><h2>${esc(panel.title)}</h2>${meta}`;
   // A bare panel has no title bar at all, so it cannot fold: there is nothing to click.
   const isFold = fold && !attrs.bare;
   const body = `<div class="am-panel-body">${panel.html}</div>`;
@@ -38,7 +43,7 @@ ${body}</details>
 ${inner}</section>`;
 }
 
-const RESERVED = new Set(['template', 'theme', 'style', 'mode', 'cols', 'title', 'subtitle', 'lang', 'collapse']);
+const RESERVED = new Set(['template', 'theme', 'style', 'mode', 'cols', 'title', 'subtitle', 'lang', 'collapse', 'drag']);
 
 // language: the page language. Its metaKeys name common keys in the page language (author in Hebrew). On a right-to-left page the value
 // sits in its own <bdi>, so a key and a value of different directions do not run together ("date7.10.2026").

@@ -112,11 +112,13 @@ theme: auto         # auto (default): paper for doc or text-only drafts, bluepri
 title: Title
 subtitle: One-line summary     # optional
 cols: 3             # most columns in a sheet row (a whole number), default 3
+collapse: false     # true folds every panel: the reader clicks its head to open and close it (print always opens them)
+drag: false         # true puts a grip in every panel head: the reader reorders the panels, and the sheet re-plans the new order
 source: RFC 9293    # any other key is shown in the page header's meta line
 ---
 Lead: one or two sentences with the core conclusion (optional).
 
-## A Panel title {span=2 meta="small text, top right"}
+## A Panel title {span=2 meta="small text, top right" collapse collapsed}
 Plain Markdown: paragraphs, lists, tables, quotes.
 Table status words: ok / no / warn (may carry text: "ok approved") → ✓ / ✗ / ! badges.
 
@@ -153,6 +155,9 @@ Table status words: ok / no / warn (may carry text: "ok approved") → ✓ / ✗
 Selection rules:
 - Conclusion first. The first panel or the lead gives the core answer; the following panels give the evidence.
 - One panel, one question. With more than 8 panels, split the page or cut panels.
+- `{collapse}` makes this panel a fold even when the page does not set `collapse: true`; `{collapsed}` also starts it closed.
+  A fold is a native `<details>`, so it opens and closes with no script, works from the keyboard, and prints open.
+  A `{bare}` panel has no head, so it never folds.
 - `span` is a hint. In a browser the sheet sizes each panel to its content and fills every row, so write no `span` for a wide table or diagram. Write `span` only for a panel that must stand out (`span` = `cols` gives it a row of its own). `span` and `rows` are whole numbers; a fraction such as `span=2.5` is an error. `rows` applies only to the plain grid (without JavaScript, in print and on narrow screens); the browser layout ignores it.
 - To show what a plan, refactor or PR summary changes in structure, write one `flow`, `tree` or `er` and mark the changed lines with `+ `, `- ` or `~ `, not a before and an after. Leave unchanged lines bare. The page shows colors, badges and counts in its Changes view and adds a Before / After switch that shows the plain diagram on either side. To change a link or a relationship, remove the old one with `-` and add the new one with `+`. A name that starts with `- ` needs brackets in `flow` (`[- Gateway]`) or `\- item` in `tree`. A marked entity gives its fields its marker; a marked field does not mark its entity. See `am help flow`, `am help tree` and `am help er`.
 - Quote code that exists with `src=` and `lines=`: the CLI reads the lines, so you type no code and the code is real. Use a path inside the current folder; files outside it are refused. Pick the 10–40 lines that make the point. Mark code that does not exist yet as a sketch in `title=`. In a diff block every line starts with `+`, `-`, a space or `@@`; do not cut lines with `...`, split the diff into two hunks. The render lists every file it embedded; tell the user before they share a page that holds private code. See `am help code`.

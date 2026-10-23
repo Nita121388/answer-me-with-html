@@ -52,6 +52,7 @@ export const VOICES = Object.freeze(['auto', 'elevenlabs', 'local', 'system', 'o
 const DEFAULT_META = Object.freeze({
   template: 'sheet',
   collapse: false,
+  drag: false,
   theme: AUTO,
   style: '80',
   mode: 'auto',
@@ -63,6 +64,8 @@ const NUMERIC_KEYS = new Set(['cols', 'span']);
 // Panel attributes. collapse makes a panel a fold; collapsed starts it folded. They are booleans when written bare,
 // so `{collapse}` and `{collapse=true}` are the same thing.
 const FOLD_ATTRS = new Set(['collapse', 'collapsed']);
+// Page-level booleans: `drag: true` makes the panels movable on the page (src/runtime/drag.js).
+const BOOL_KEYS = new Set([...FOLD_ATTRS, 'drag']);
 const FENCE_OPEN = /^(`{3,}|~{3,})\s*([^\s`]*)\s*(.*)$/;
 const PANEL_HEADING = /^##\s+(.+?)\s*$/;
 const ATTR_BLOCK = /\s*\{([^{}]*)\}\s*$/;
@@ -348,6 +351,6 @@ const OFF = new Set(['false', 'off', '0', 'no']);
 
 function coerce(key, value) {
   if (NUMERIC_KEYS.has(key) && /^\d+$/.test(value)) return Number(value);
-  if (FOLD_ATTRS.has(key)) return value === true || !OFF.has(String(value).trim().toLowerCase());
+  if (BOOL_KEYS.has(key)) return value === true || !OFF.has(String(value).trim().toLowerCase());
   return value;
 }

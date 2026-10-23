@@ -32,7 +32,7 @@ if (panelList().length > 1) {
   // The style each element had before this script first wrote to it. The snapshot is taken after restore(), when every element
   // carries its rendered style again, so an element first seen on a later pass is captured then and not with a written style.
   const original = new Map();
-  const styled = () => [grid, ...panelList(), ...grid.querySelectorAll('.am-diagram > svg'), ...grid.querySelectorAll('.am-table-wrap > table').flatMap(headCells)];
+  const styled = () => [grid, ...panelList(), ...grid.querySelectorAll('.am-diagram > svg'), ...[...grid.querySelectorAll('.am-table-wrap > table')].flatMap(headCells)];
   const snapshot = () => {
     for (const el of styled()) if (!original.has(el)) original.set(el, el.getAttribute('style'));
   };
@@ -192,7 +192,10 @@ if (panelList().length > 1) {
   const announce = (applied) => document.dispatchEvent(new CustomEvent('am-layout', { detail: { applied } }));
 
   function justify() {
-    if (printing || printQuery.matches) return;
+    // While a reader is moving a panel the grid is deliberately out of order (src/runtime/drag.js): planning now would measure
+    // the ghost and undo the drag. The drop sends am-replan, which plans the new order.
+    if (printing || printQuery.matches || document.documentElement.hasAttribute('data-am-dragging')) return;
+    // A panel that the reader moved is waiting for its new order: the drop sends am-replan.
     let applied = false;
     try {
       // A vertical scrollbar can appear or vanish once the rows change height; plan again if the width moved.

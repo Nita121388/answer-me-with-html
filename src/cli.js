@@ -72,11 +72,14 @@ subtitle: Subtitle     # optional
 cols: 3                # number of sheet grid columns, default 3
 style: 80              # STE check strictness: off | 80 (default, warn only) | strict (no page if it fails)
 mode: auto             # auto follows the system | light | dark
+collapse: false        # true makes every panel a fold: the reader clicks its head to open and close it (print always opens them)
+drag: false            # true adds a grip to every panel head: the reader reorders the panels, and the sheet plans the new order
 source: asd-ste100.org # any other key shows in the page header meta line
 ---
 Intro (optional, shown below the title)
 
-## A Panel title {span=2 meta="top-right note"}
+## A Panel title {span=2 meta="top-right note" collapse collapsed}
+{span=2} wide hint; {bare} no title bar; {collapse} this panel folds even when the page does not; {collapsed} it starts folded.
 Plain Markdown: paragraphs, lists, tables, quotes, inline code...
 Write ok / no / warn in a table cell (text may follow, e.g. "ok approved") to get a ✓ / ✗ / ! badge.
 
