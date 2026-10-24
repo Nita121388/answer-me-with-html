@@ -10,8 +10,14 @@ const P = (id, x, y) => ({ id, attrs: x === undefined ? {} : { x, y }, html: 'x'
 
 test('canvas edges: A -> B and A -> B: label parse; comments and blank lines are ignored', () => {
   assert.deepEqual(parseCanvasEdges('// a note\n\nA -> B\nB -> C: 依赖'), [
-    { from: 'A', to: 'B', label: '' },
-    { from: 'B', to: 'C', label: '依赖' },
+    { from: { id: 'A' }, to: { id: 'B' }, label: '' },
+    { from: { id: 'B' }, to: { id: 'C' }, label: '依赖' },
+  ]);
+});
+
+test('canvas edges: a quoted title names a panel without its letter, so an inserted panel cannot move the edge', () => {
+  assert.deepEqual(parseCanvasEdges('"输入" -> "中间": 依据'), [
+    { from: { title: '输入' }, to: { title: '中间' }, label: '依据' },
   ]);
 });
 

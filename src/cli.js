@@ -67,7 +67,9 @@ const FORMAT = `Draft format (extended Markdown)
 ---
 template: sheet        # sheet: board (default, justified grid) | doc: linear explainer (one column + contents)
                        # canvas: an infinite board of panels that the reader pans, zooms and drags; the edges come from
-                       #         a canvas fence in the intro (before the first panel): A -> B or A -> B: label
+                       #         a canvas fence in the intro (before the first panel): A -> B or A -> B: label;
+                       #         write "Panel title" -> "Other title" to name a panel by title, which survives an inserted panel;
+                       #         "Panel title" -> "Other title" names a panel by its title and survives an inserted panel
 theme: auto            # auto (default): paper for the doc template or text only, blueprint with diagrams | blueprint | shadcn | paper; switchable in the page
 title: Page title      # or use "# Title" as the first line of the body
 subtitle: Subtitle     # optional

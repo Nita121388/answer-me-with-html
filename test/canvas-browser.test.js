@@ -43,7 +43,8 @@ The third node, at the far end of the board.
 `;
 
 const IDS = ['panel-A', 'panel-B', 'panel-C'];
-const storeKeyExpr = `'am-canvas:' + location.pathname + ':' + ${JSON.stringify(IDS.join(','))}`;
+// The board is keyed by the page path, not by the panel list: a re-render keeps it even when the letters shift.
+const storeKeyExpr = `'am-canvas:' + location.pathname`;
 
 let tmp;
 let chrome;

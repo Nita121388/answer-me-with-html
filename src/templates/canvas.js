@@ -23,8 +23,17 @@ const estimateHeight = (panel) => {
   return Math.max(NODE_MIN_H, 46 + Math.ceil(text.trim().length / 55) * 22);
 };
 
-// One edge per line: "A -> B" or "A -> B: label". A panel is named by its id (A, B, C …).
-const EDGE_LINE = /^([A-Z][0-9]{0,2})\s*->\s*([A-Z][0-9]{0,2})\s*(?::\s*(.*))?$/;
+// One edge per line: "A -> B" or "A -> B: label". A panel is named by its id (A, B, C …) or, in quotes, by its title.
+// An id is a letter, and letters are assigned by position, so inserting a panel above re-letters the ones below it and every
+// edge written by letter then points somewhere else. A quoted title does not move, which is what a board that outlives its
+// draft wants.
+const EDGE_END = /^("(?:[^"\\]|\\.)*"|[A-Z][0-9]{0,2})$/;
+const EDGE_LINE = /^(\S.*?)\s*->\s*(\S.*?)\s*(?::\s*(.*))?$/;
+
+// "Text" becomes { title: 'Text' }; A becomes { id: 'A' }.
+const refOf = (raw) => (raw.startsWith('"') && raw.endsWith('"')
+  ? { title: raw.slice(1, -1).replace(/\\(["\\])/g, '$1') }
+  : { id: raw });
 
 export function parseCanvasEdges(text, line = 1) {
   const edges = [];
@@ -34,8 +43,10 @@ export function parseCanvasEdges(text, line = 1) {
       const s = raw.trim();
       if (!s || s.startsWith('//')) return;
       const m = s.match(EDGE_LINE);
-      if (!m) throw new CanvasEdgeError(`"${s}" is not an edge; write "A -> B" or "A -> B: label"`, line + i);
-      edges.push({ from: m[1], to: m[2], label: (m[3] ?? '').trim() });
+      if (!m || !EDGE_END.test(m[1].trim()) || !EDGE_END.test(m[2].trim())) {
+        throw new CanvasEdgeError(`"${s}" is not an edge; write "A -> B", "A -> B: label" or use quoted titles`, line + i);
+      }
+      edges.push({ from: refOf(m[1].trim()), to: refOf(m[2].trim()), label: (m[3] ?? '').trim() });
     });
   return edges;
 }
@@ -123,20 +134,35 @@ export function placePanels(panels, edges, direction = 'LR') {
 // The canvas body: a stage holding one SVG layer of edges and one absolutely positioned node per panel.
 export function canvas({ meta, introHtml, panels, ui, language, edges = [] }) {
   const known = new Set(panels.map((p) => p.id));
-  const dropped = edges.filter((e) => !known.has(e.from) || !known.has(e.to));
-  const kept = edges.filter((e) => known.has(e.from) && known.has(e.to));
+  // An edge end is an id or a quoted title, which is the stable way to name a panel: a title does not move when the draft grows.
+  const idOf = (ref) => {
+    if (!ref) return null;
+    if (ref.id) return known.has(ref.id) ? ref.id : null;
+    const match = panels.filter((p) => p.title === ref.title);
+    return match.length === 1 ? match[0].id : null;
+  };
+  const resolved = edges.map((e) => ({ from: idOf(e.from), to: idOf(e.to), raw: e, label: e.label }));
+  const kept = resolved.filter((e) => e.from && e.to);
+  const dropped = resolved.filter((e) => !e.from || !e.to).map((e) => ({
+    from: e.raw.from.title ?? e.raw.from.id,
+    to: e.raw.to.title ?? e.raw.to.id,
+  }));
   // direction: LR (left to right, the default) | TB (top to bottom, better for a long chain of panels).
   const { boxes, width, height } = placePanels(panels, kept, meta.dir ?? meta.direction);
   const uid = `c${Math.abs(hash(meta.title ?? '') % 100000)}`;
+  // The labels of the board's own controls, one entry per language file (ui.canvas).
+  const c = ui?.canvas ?? {};
 
   const nodes = panels
     .map((p) => {
       const b = boxes.get(p.id) ?? { x: 0, y: 0, w: NODE_W, h: NODE_MIN_H };
       const html = panelHtml(p, { cols: 1, grid: false, folds: meta.collapse === true, drag: false, moveLabel: ui?.move });
+      // The port starts a new edge (src/runtime/canvas-dom.js): press it and drop on another panel.
+      const port = `<button class="am-canvas-port" type="button" data-am="canvas-port" aria-label="${esc(c.linkFrom ?? 'Link from this panel')}"></button>`;
       return html.replace(
         /^<section class="am-panel/,
         `<section data-box="${f(b.x)} ${f(b.y)}" class="am-canvas-node am-panel`,
-      ).replace(/>\n/, ` style="left:${f(b.x)}px;top:${f(b.y)}px;width:${f(b.w)}px">\n`);
+      ).replace(/>\n/, ` style="left:${f(b.x)}px;top:${f(b.y)}px;width:${f(b.w)}px">\n${port}`);
     })
     .join('\n');
 
@@ -152,12 +178,21 @@ export function canvas({ meta, introHtml, panels, ui, language, edges = [] }) {
     })
     .join('\n');
 
-  // The zoom controls speak the page language (ui.canvas, one entry per language file).
-  const c = ui?.canvas ?? {};
+  // The zoom and edge controls sit in the corner of the viewport. A board can be edited: the port on each node starts an edge,
+  // a click selects one, and deviating from the draft is written into this browser until it is copied back (src/runtime/canvas-dom.js).
   const zoomOut = c.zoomOut ?? 'Zoom out';
   const zoomIn = c.zoomIn ?? 'Zoom in';
   const fit = c.fit ?? 'Fit';
   const reset = c.reset ?? 'Reset';
+  const copyEdges = c.copyEdges ?? 'Copy edges';
+  const controls = `<div class="am-canvas-zoom">`
+    + `<button class="am-btn" type="button" data-am="canvas-zoom-out" aria-label="${esc(zoomOut)}">−</button>`
+    + `<span class="am-btn" data-am="canvas-zoom-value">100%</span>`
+    + `<button class="am-btn" type="button" data-am="canvas-zoom-in" aria-label="${esc(zoomIn)}">+</button>`
+    + `<button class="am-btn" type="button" data-am="canvas-fit">${esc(fit)}</button>`
+    + `<button class="am-btn" type="button" data-am="canvas-copy-edges" hidden>${esc(copyEdges)}</button>`
+    + `<button class="am-btn" type="button" data-am="canvas-reset">${esc(reset)}</button>`
+    + `</div>`;
   return `<main class="am-canvas" data-canvas>
 ${headHtml(meta, introHtml, language)}
 <div class="am-canvas-viewport">
@@ -165,7 +200,7 @@ ${headHtml(meta, introHtml, language)}
 <svg class="am-canvas-edges" width="${Math.ceil(width)}" height="${Math.ceil(height)}" aria-hidden="true">${arrowDefs(uid)}
 ${paths}
 </svg>
-<div class="am-canvas-zoom"><button class="am-btn" type="button" data-am="canvas-zoom-out" aria-label="${esc(zoomOut)}">−</button><span class="am-btn" data-am="canvas-zoom-value">100%</span><button class="am-btn" type="button" data-am="canvas-zoom-in" aria-label="${esc(zoomIn)}">+</button><button class="am-btn" type="button" data-am="canvas-fit">${esc(fit)}</button><button class="am-btn" type="button" data-am="canvas-reset">${esc(reset)}</button></div>
+${controls}
 <div class="am-canvas-nodes">
 ${nodes}
 </div>

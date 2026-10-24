@@ -37,11 +37,12 @@ html:not([data-canvas-live]) .am-canvas-viewport { overflow: auto; cursor: auto;
   paint-order: stroke; stroke: var(--bg); stroke-width: 4px; stroke-linejoin: round;
 }
 
-.am-canvas-nodes { position: absolute; inset: 0; }
+/* The layer holds the nodes and covers the whole stage, so it must not swallow the clicks meant for an edge under it. */
+.am-canvas-nodes { position: absolute; inset: 0; pointer-events: none; }
 
 /* A node is a panel taken out of the document flow: its width comes from the template, its height from its content. */
 .am-canvas .am-canvas-node {
-  position: absolute; margin: 0;
+  position: absolute; margin: 0; pointer-events: auto;
   /* The planner's flex rules do not apply here; a node sizes to the width the template gave it. */
   display: block;
   box-shadow: var(--shadow);
@@ -75,3 +76,32 @@ html:not([data-canvas-live]) .am-canvas-zoom { display: none; }
   .am-canvas-stage { transform: none !important; }
   .am-canvas-zoom { display: none !important; }
 }
+
+/* ── Editing the board ────────────────────── */
+/* A port on each node starts an edge: press it and drop on another panel (src/runtime/canvas-dom.js). It sits on the trailing
+   edge of the head, so it follows the page direction. */
+.am-canvas-port {
+  /* Inside the panel: .am-panel clips its overflow, so a port hanging outside would be cut off and never clicked. */
+  position: absolute; top: 10px; inset-inline-end: 8px; z-index: 3;
+  width: 14px; height: 14px; padding: 0; border: 2px solid var(--line-2); border-radius: 50%;
+  background: var(--paper); cursor: crosshair;
+}
+.am-canvas-port:hover, .am-canvas-port:focus-visible { border-color: var(--accent); background: var(--accent); outline: none; }
+.am-canvas-port:focus-visible { box-shadow: 0 0 0 3px color-mix(in oklab, var(--accent) 35%, transparent); }
+
+/* An edge is drawn thin but caught by a wide invisible stroke, so a click on it is easy. */
+.am-canvas-edges { pointer-events: none; }
+.am-canvas-edge-hit { fill: none; stroke: transparent; stroke-width: 16; pointer-events: stroke; cursor: pointer; }
+.am-canvas-edge.is-selected path:not(.am-canvas-edge-hit) { stroke: var(--accent); stroke-width: 2.4; }
+.am-canvas-edge.is-selected .am-canvas-edge-label { fill: var(--accent); }
+.am-canvas-edge:hover path:not(.am-canvas-edge-hit) { stroke: var(--ink-3); }
+/* The temporary line that follows the pointer while a new edge is being drawn. */
+.am-canvas-link { fill: none; stroke: var(--accent); stroke-width: 2; stroke-dasharray: 6 4; pointer-events: none; }
+
+/* The label editor sits over the edge's midpoint, in viewport coordinates so the zoom does not shrink it. */
+.am-canvas-label-input {
+  position: absolute; z-index: 8; min-width: 120px; padding: 4px 8px;
+  font: var(--am-fs-small)/1.4 var(--font-sans); color: var(--ink); background: var(--paper);
+  border: 1px solid var(--accent); border-radius: var(--radius);
+}
+.am-canvas-label-input:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
