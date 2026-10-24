@@ -334,7 +334,7 @@ function shell({ meta, language, body, source, embedded, update, closeAfter, sca
 ${rootTag(root)}
 <head>
 <meta charset="utf-8">
-${cspMeta([script], { live: true })}
+${cspMeta([script], { live: true, blob: meta.template === 'canvas' })}
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="generator" content="Answer me with HTML ${VERSION}">
 <title>${esc(meta.title || 'Answer me with HTML')}</title>

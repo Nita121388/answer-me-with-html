@@ -90,3 +90,23 @@ test('canvas: the page script parses, since the CSP pins a hash of its exact tex
   const script = html.match(/<script>([\s\S]*)<\/script>/)?.[1] ?? '';
   assert.doesNotThrow(() => new Function(script));
 });
+
+test('canvas: the stylesheet parses, so no rule is swallowed by a stray comment', () => {
+  // CSS has no // line comments: a block of them at the top of a stylesheet is read as a selector, and the first rule after it
+  // is swallowed. This is how the .am-canvas layout rule was silently lost once.
+  const { html } = renderDoc(['---', 'template: canvas', '---', '```canvas', 'A -> B', '```', '## A One', 'x', '', '## B Two', 'x'].join('\n'));
+  const css = html.match(/<style>([\s\S]*?)<\/style>/)?.[1] ?? '';
+  assert.doesNotMatch(css, /(^|\n)\s*\/\/ /, 'a // line comment is not valid CSS and eats the rule after it');
+  // Every block that opens also closes.
+  let depth = 0;
+  for (const ch of css) {
+    if (ch === '{') depth++;
+    else if (ch === '}') depth--;
+    assert.ok(depth >= 0, 'no block closes before it opens');
+  }
+  assert.equal(depth, 0, 'every block closes');
+  // And the rules the board's layout depends on are all present.
+  for (const sel of ['.am-canvas {', '.am-canvas-viewport', '.am-canvas-stage', '.am-canvas-minimap', '.am-mini-view']) {
+    assert.ok(css.includes(sel), `${sel} is in the page`);
+  }
+});

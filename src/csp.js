@@ -19,7 +19,14 @@ export const scriptHash = (text) => `'sha256-${sha256Base64(text)}'`;
 export const pinScript = (html, text) => html.replace(/(<meta http-equiv="Content-Security-Policy" content="[^"]*?script-src )/, `$1${scriptHash(text)} `);
 
 // `scripts`: the exact text of each executable inline <script> in the page. connect-src 'self' is for the live-reload EventSource.
-export function cspMeta(scripts, { live = false } = {}) {
+//
+// default-src 'none' refuses everything a page did not ask for, which is the point: a raw html / svg fence must not be able to
+// send a request. The few things a page does on purpose are named on top of it:
+//   img/font/media data: — the page embeds its own images, fonts and narration, and nothing remote;
+//   style unsafe-inline  — the themes, the diagrams and the layout all write style attributes;
+//   connect-src 'self'   — the live-reload stream under `am serve`;
+//   navigate-to blob:    — the canvas board's Export .drawio button saves the file it built through a blob URL.
+export function cspMeta(scripts, { live = false, blob = false } = {}) {
   const hashes = [...scripts, ...(live ? [LIVE_SCRIPT_BODY] : [])].map(scriptHash);
   const policy = [
     "default-src 'none'",
@@ -29,6 +36,8 @@ export function cspMeta(scripts, { live = false } = {}) {
     'font-src data:',
     'media-src data:',
     "connect-src 'self'",
+    // A canvas page can save the .drawio file it builds; nothing else on the page opens a blob.
+    ...(blob ? ["navigate-to blob:"] : []),
     "form-action 'none'",
     "base-uri 'none'",
   ].join('; ');

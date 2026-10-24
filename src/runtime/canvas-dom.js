@@ -49,6 +49,7 @@
 
   const apply = () => {
     stage.style.transform = `translate(${x.toFixed(2)}px, ${y.toFixed(2)}px) scale(${scale.toFixed(4)})`;
+    placeMinimap();
     const label = document.querySelector('[data-am="canvas-zoom-value"]');
     if (label) label.textContent = `${Math.round(scale * 100)}%`;
   };
@@ -173,6 +174,8 @@
         text.setAttribute('y', String(Math.round(m.y)));
       }
     }
+    // A node moved or changed height, so its rectangle in the minimap moved with it.
+    placeMinimap();
   };
 
   // ---- the selection: one node, several, or none ----
@@ -520,8 +523,10 @@
   };
 
   viewport.addEventListener('pointerdown', (e) => {
-    // A press that starts on a node belongs to the node; a press on an edge selects it (the layer's own handler).
-    if (e.button !== 0 || panning || box || e.target.closest('.am-canvas-edge')) return;
+    // A press that starts on a node belongs to the node; a press on an edge selects it (the layer's own handler). A press on the
+    // toolbar or the minimap belongs to those: capturing the pointer for a pan would retarget the click to the viewport, and the
+    // button would never see it.
+    if (e.button !== 0 || panning || box || e.target.closest('.am-canvas-edge, .am-canvas-zoom, .am-canvas-minimap')) return;
     if (e.shiftKey) {
       // Shift extends the selection, so the box starts from what is already selected.
       const r = viewport.getBoundingClientRect();
@@ -648,6 +653,114 @@
     setTimeout(() => URL.revokeObjectURL(a.href), 1000);
   };
 
+  // ---- the minimap ----
+  // A small picture of the whole board: one rectangle per panel, plus the part of the board that is in view. Clicking or dragging
+  // on it moves the view, which is the fastest way across a board that is wider than the screen.
+  const minimap = document.querySelector('[data-am="canvas-minimap"]');
+  const minimapSvg = document.querySelector('[data-am="canvas-minimap-svg"]');
+  const MINIMAP_MAX = 168; // px, the longer side of the picture
+  const MINIMAP_MIN = 56; // px, so a board of one panel is not a dot
+  let mini = { scale: 1, w: 0, h: 0 }; // px of the picture per px of the board
+  const miniRects = new Map(); // node -> its rect in the minimap
+  let miniView = null;
+
+  const svgEl = (name, attrs) => {
+    const node = document.createElementNS(SVG, name);
+    for (const [k, v] of Object.entries(attrs)) node.setAttribute(k, v);
+    return node;
+  };
+
+  // The picture is laid out from the board's own size, so it never depends on the current zoom.
+  const buildMinimap = () => {
+    if (!minimap || !minimapSvg) return;
+    const boardW = stage.offsetWidth;
+    const boardH = stage.offsetHeight;
+    if (!boardW || !boardH) return;
+    const scale = Math.min(MINIMAP_MAX / boardW, MINIMAP_MAX / boardH, 1);
+    const w = Math.max(MINIMAP_MIN, Math.round(boardW * scale));
+    const h = Math.max(MINIMAP_MIN, Math.round(boardH * scale));
+    // A board smaller than the picture is centred in it rather than stretched.
+    mini = { scale: w / boardW, w, h, offX: 0, offY: 0 };
+    minimapSvg.setAttribute('width', String(w));
+    minimapSvg.setAttribute('height', String(h));
+    minimapSvg.setAttribute('viewBox', `0 0 ${w} ${h}`);
+    minimapSvg.textContent = '';
+    miniRects.clear();
+    for (const node of nodes) {
+      const r = svgEl('rect', {
+        x: 0, y: 0, width: 6, height: 4, rx: 1,
+        class: 'am-mini-node',
+      });
+      minimapSvg.append(r);
+      miniRects.set(node, r);
+    }
+    miniView = svgEl('rect', { x: 0, y: 0, width: 0, height: 0, class: 'am-mini-view' });
+    minimapSvg.append(miniView);
+    minimap.hidden = false;
+    placeMinimap();
+  };
+
+  const placeMinimap = () => {
+    if (!minimap || !miniRects.size) return;
+    for (const [node, rect] of miniRects) {
+      const left = parseFloat(node.style.left) || 0;
+      const top = parseFloat(node.style.top) || 0;
+      rect.setAttribute('x', String(Math.round(left * mini.scale)));
+      rect.setAttribute('y', String(Math.round(top * mini.scale)));
+      rect.setAttribute('width', String(Math.max(2, Math.round(node.offsetWidth * mini.scale))));
+      rect.setAttribute('height', String(Math.max(2, Math.round(node.offsetHeight * mini.scale))));
+    }
+    if (!miniView) return;
+    // The part of the board in view, in board units: the viewport size divided by the zoom, at the negated pan.
+    const r = viewport.getBoundingClientRect();
+    const vx = Math.max(0, -x / scale);
+    const vy = Math.max(0, -y / scale);
+    const vw = Math.min(stage.offsetWidth, r.width / scale);
+    const vh = Math.min(stage.offsetHeight, r.height / scale);
+    miniView.setAttribute('x', String(Math.round(vx * mini.scale)));
+    miniView.setAttribute('y', String(Math.round(vy * mini.scale)));
+    miniView.setAttribute('width', String(Math.max(4, Math.round(vw * mini.scale))));
+    miniView.setAttribute('height', String(Math.max(4, Math.round(vh * mini.scale))));
+  };
+
+  // Move the view so the board point under the minimap pointer sits in the middle of the viewport.
+  const centreOnMini = (e) => {
+    const box = minimapSvg.getBoundingClientRect();
+    const px = (e.clientX - box.left) / mini.scale;
+    const py = (e.clientY - box.top) / mini.scale;
+    const r = viewport.getBoundingClientRect();
+    x = r.width / 2 - px * scale;
+    y = r.height / 2 - py * scale;
+    apply();
+    placeMinimap();
+  };
+
+  if (minimap && minimapSvg) {
+    let dragging = null;
+    minimapSvg.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      dragging = e.pointerId;
+      minimapSvg.setPointerCapture?.(e.pointerId);
+      centreOnMini(e);
+    });
+    minimapSvg.addEventListener('pointermove', (e) => {
+      if (dragging !== e.pointerId) return;
+      e.preventDefault();
+      centreOnMini(e);
+    });
+    const end = (e) => {
+      if (dragging !== e.pointerId) return;
+      dragging = null;
+      try {
+        minimapSvg.releasePointerCapture(e.pointerId);
+      } catch {}
+      save();
+    };
+    minimapSvg.addEventListener('pointerup', end);
+    minimapSvg.addEventListener('pointercancel', end);
+  }
+
   const fit = () => {
     const r = viewport.getBoundingClientRect();
     const w = stage.offsetWidth;
@@ -724,7 +837,13 @@
     fit();
   }
   renderEdges();
-  // The nodes' heights settle after the fonts arrive; the edges are drawn from the boxes, so they follow.
-  document.fonts?.ready.then(renderEdges);
-  addEventListener('resize', renderEdges);
+  buildMinimap();
+  // The nodes' heights settle after the fonts arrive; the edges are drawn from the boxes, so they follow, and the minimap's
+  // rectangles are sized from the same boxes.
+  const settle = () => {
+    renderEdges();
+    buildMinimap();
+  };
+  document.fonts?.ready.then(settle);
+  addEventListener('resize', settle);
 })();

@@ -178,13 +178,25 @@ test('canvas: the wheel zooms in and out about the pointer, and the label follow
 test('canvas: a press on empty space pans the board, and the nodes stay where they were', { skip: SKIP, timeout: 60000 }, async () => {
   await open();
   const start = await board();
-  await mouse('mousePressed', DESKTOP - 60, HEIGHT - 60);
-  await mouse('mouseMoved', DESKTOP - 60, HEIGHT - 60);
-  await mouse('mouseMoved', DESKTOP - 60, HEIGHT - 260);
-  await mouse('mouseReleased', DESKTOP - 60, HEIGHT - 260);
+  await mouse('mousePressed', Math.round(DESKTOP / 2), HEIGHT - 60);
+  await mouse('mouseMoved', Math.round(DESKTOP / 2), HEIGHT - 60);
+  await mouse('mouseMoved', Math.round(DESKTOP / 2), HEIGHT - 260);
+  await mouse('mouseReleased', Math.round(DESKTOP / 2), HEIGHT - 260);
   const after = await board();
   assert.ok(Math.abs(after.y - start.y) > 100, `the board panned up: y ${start.y} -> ${after.y}`);
   assert.deepEqual(after.nodes, start.nodes, 'panning moved no node');
+});
+
+test('canvas: a press on the minimap moves the view instead of panning the board', { skip: SKIP, timeout: 60000 }, async () => {
+  await open();
+  const before = await board();
+  const r = JSON.parse(await evaluate(`JSON.stringify(document.querySelector('[data-am="canvas-minimap-svg"]').getBoundingClientRect())`));
+  await mouse('mousePressed', Math.round(r.left + 6), Math.round(r.top + 6));
+  await mouse('mouseReleased', Math.round(r.left + 6), Math.round(r.top + 6));
+  await new Promise((res) => setTimeout(res, 200));
+  const after = await board();
+  assert.ok(after.x !== before.x || after.y !== before.y, 'the minimap moved the view');
+  assert.deepEqual(after.nodes, before.nodes, 'and moved no node');
 });
 
 test('canvas: dragging a node moves only that node, and its two edges are redrawn', { skip: SKIP, timeout: 60000 }, async () => {
@@ -362,4 +374,99 @@ test('canvas: the Export .drawio button saves a file named after the page, and t
   assert.equal((captured.text.match(/vertex="1"/g) ?? []).length, 3, 'one vertex per panel');
   assert.equal((captured.text.match(/edge="1"/g) ?? []).length, 2, 'one edge per link');
   assert.doesNotMatch(captured.text, /undefined|NaN/);
+});
+
+test('canvas: the controls are outside the scaled stage, so a fit board keeps clickable buttons', { skip: SKIP, timeout: 60000 }, async () => {
+  await open();
+  // The stage is what the board's transform scales; the controls and the minimap sit in the viewport, not inside it.
+  const sizes = await evaluate(`JSON.stringify({
+    stage: document.querySelector('[data-canvas-stage]').style.transform,
+    drawio: (() => { const r = document.querySelector('[data-am="canvas-drawio"]').getBoundingClientRect(); return [Math.round(r.width), Math.round(r.height)]; })(),
+    fitBtn: (() => { const r = document.querySelector('[data-am="canvas-fit"]').getBoundingClientRect(); return [Math.round(r.width), Math.round(r.height)]; })(),
+    outsideStage: !document.querySelector('[data-canvas-stage]').contains(document.querySelector('[data-am="canvas-drawio"]')),
+    inViewport: document.querySelector('.am-canvas-viewport').contains(document.querySelector('[data-am="canvas-drawio"]')),
+  })`).then(JSON.parse);
+  assert.equal(sizes.outsideStage, true, 'the button is not in the scaled stage');
+  assert.equal(sizes.inViewport, true, 'the button is in the viewport');
+  assert.ok(sizes.drawio[0] >= 40 && sizes.drawio[1] >= 18, `the button keeps its size: ${sizes.drawio.join('x')}`);
+  assert.ok(sizes.fitBtn[0] >= 20, `the fit button is clickable: ${sizes.fitBtn.join('x')}`);
+});
+
+test('canvas: the minimap shows every node and the view, and a click on it moves the view', { skip: SKIP, timeout: 60000 }, async () => {
+  await clearArrangement();
+  await open();
+  const mm = await evaluate(`JSON.stringify({
+    hidden: document.querySelector('[data-am="canvas-minimap"]').hidden,
+    rects: document.querySelectorAll('.am-mini-node').length,
+    view: !!document.querySelector('.am-mini-view'),
+    w: document.querySelector('[data-am="canvas-minimap-svg"]').getAttribute('width'),
+    h: document.querySelector('[data-am="canvas-minimap-svg"]').getAttribute('height'),
+    viewBox: document.querySelector('[data-am="canvas-minimap-svg"]').getAttribute('viewBox'),
+  })`).then(JSON.parse);
+  assert.equal(mm.hidden, false, 'the minimap is shown');
+  assert.equal(mm.rects, 3, 'one rectangle per node');
+  assert.equal(mm.view, true, 'the view rectangle is drawn');
+  assert.ok(Number(mm.w) > 0 && Number(mm.h) > 0, `the picture has a size: ${mm.w}x${mm.h}`);
+  assert.ok(Number(mm.w) <= 168 && Number(mm.h) <= 168, 'the picture stays small');
+
+  const before = await board();
+  // Click the far corner of the minimap: the view moves to the opposite end of the board.
+  const r = JSON.parse(await evaluate(`JSON.stringify(document.querySelector('[data-am="canvas-minimap-svg"]').getBoundingClientRect())`));
+  await mouse('mousePressed', Math.round(r.left + r.width - 4), Math.round(r.top + r.height - 4));
+  await mouse('mouseReleased', Math.round(r.left + r.width - 4), Math.round(r.top + r.height - 4));
+  await new Promise((res) => setTimeout(res, 250));
+  const after = await board();
+  assert.ok(after.x !== before.x || after.y !== before.y, 'the view moved');
+  assert.deepEqual(after.nodes, before.nodes, 'a click on the minimap moved no node');
+});
+
+test('canvas: a zoom or a pan keeps the minimap picture in step with the view', { skip: SKIP, timeout: 60000 }, async () => {
+  await open();
+  const viewRect = () => evaluate(`(() => {
+    const r = document.querySelector('.am-mini-view');
+    return JSON.stringify({ x: Number(r.getAttribute('x')), y: Number(r.getAttribute('y')), w: Number(r.getAttribute('width')), h: Number(r.getAttribute('height')) });
+  })()`).then(JSON.parse);
+  const before = await viewRect();
+  await wheel(DESKTOP / 2, HEIGHT / 2, -240);
+  const zoomed = await viewRect();
+  assert.notDeepEqual(zoomed, before, 'the view rectangle follows the zoom');
+  assert.ok(zoomed.w <= before.w, 'a zoom in shrinks the marked area');
+});
+
+test('canvas: the toolbar sits inside the window, so a real click reaches its buttons', { skip: SKIP, timeout: 60000 }, async () => {
+  await open();
+  // The board takes what the head leaves of the window: a viewport taller than that would push its own toolbar off screen, and
+  // every button in it would be unclickable (this is how the Export button first shipped broken).
+  const geo = await evaluate(`JSON.stringify((() => {
+    const vp = document.querySelector('.am-canvas-viewport').getBoundingClientRect();
+    const b = document.querySelector('[data-am="canvas-drawio"]').getBoundingClientRect();
+    const hit = document.elementFromPoint(Math.round(b.left + b.width / 2), Math.round(b.top + b.height / 2));
+    return {
+      viewportBottom: Math.round(vp.bottom),
+      windowHeight: innerHeight,
+      button: [Math.round(b.left), Math.round(b.top), Math.round(b.width), Math.round(b.height)],
+      hitIsButton: !!hit && hit.getAttribute('data-am') === 'canvas-drawio',
+    };
+  })())`).then(JSON.parse);
+  assert.ok(geo.viewportBottom <= geo.windowHeight + 1, `the viewport ends inside the window: ${geo.viewportBottom} <= ${geo.windowHeight}`);
+  assert.equal(geo.hitIsButton, true, 'the centre of the button is the button, not something covering it');
+  assert.ok(geo.button[2] >= 40, `the button keeps a clickable width: ${geo.button[2]}`);
+});
+
+test('canvas: a real press on the zoom buttons is not swallowed by the board pan', { skip: SKIP, timeout: 60000 }, async () => {
+  await open();
+  const zoom = await evaluate(`document.querySelector('[data-am="canvas-zoom-value"]').textContent`);
+  const at = async (sel) => JSON.parse(await evaluate(`(() => { const r = document.querySelector(${JSON.stringify(sel)}).getBoundingClientRect(); return JSON.stringify({ x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) }); })()`));
+  const plus = await at('[data-am="canvas-zoom-in"]');
+  await mouse('mousePressed', plus.x, plus.y);
+  await mouse('mouseReleased', plus.x, plus.y);
+  await new Promise((r) => setTimeout(r, 200));
+  const zoomed = await evaluate(`document.querySelector('[data-am="canvas-zoom-value"]').textContent`);
+  assert.notEqual(zoomed, zoom, `a real click zoomed: ${zoom} -> ${zoomed}`);
+
+  const fit = await at('[data-am="canvas-fit"]');
+  await mouse('mousePressed', fit.x, fit.y);
+  await mouse('mouseReleased', fit.x, fit.y);
+  await new Promise((r) => setTimeout(r, 300));
+  assert.notEqual(await evaluate(`document.querySelector('[data-am="canvas-zoom-value"]').textContent`), zoomed, 'a real click on Fit fitted the board again');
 });

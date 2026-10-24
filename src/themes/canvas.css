@@ -1,15 +1,26 @@
-// The canvas template stylesheet: a viewport that clips, a stage that the page script pans and zooms, an SVG layer of edges under
-// absolutely positioned panels (src/templates/canvas.js, src/runtime/canvas-dom.js).
-//
-// Without JavaScript the stage renders at its computed size with no panning: every node sits where the build put it, and the page
-// scrolls. That is the honest fallback, and it prints.
+/* The canvas template stylesheet: a viewport that clips, a stage that the page script pans and zooms, and an SVG layer of
+   edges under absolutely positioned panels (src/templates/canvas.js, src/runtime/canvas-dom.js).
 
-.am-canvas { padding: 0 0 24px; }
+   Without JavaScript the stage renders at its computed size with no panning: every node sits where the build put it, and the
+   page scrolls. That is the honest fallback, and it prints. */
+
+/* The page is the head and then the board, and the board takes what is left of the window. A fixed height minus a guess
+   does not work: the head grows with the title and the intro, and a viewport 62px too tall puts its own toolbar off screen. */
+.am-canvas {
+  display: flex; flex-direction: column;
+  box-sizing: border-box;
+  /* 100vh is the fallback: dvh is newer and resolves to nothing where it is unknown, which would leave the board 420px tall. */
+  min-height: calc(100vh - 24px);
+  min-height: calc(100dvh - 24px);
+  padding: 0 0 24px;
+}
+.am-canvas > .am-head { flex: 0 0 auto; }
 
 /* The viewport clips the stage and owns the pan: the stage moves inside it with a transform, so nothing reflows while panning. */
 .am-canvas-viewport {
   position: relative; overflow: hidden;
-  height: calc(100vh - 120px); min-height: 420px;
+  /* flex: the viewport takes the rest of the page, whatever the head needs. */
+  flex: 1 1 auto; min-height: 420px;
   border: var(--bw) solid var(--line); border-radius: var(--radius);
   background: var(--bg);
   /* A faint dot grid, drawn with two gradients so no image is needed. */
@@ -124,3 +135,21 @@ html:not([data-canvas-live]) .am-canvas-zoom { display: none; }
   border-radius: 2px;
 }
 .am-canvas-marquee[hidden] { display: none; }
+
+/* ── The minimap ───────────────────────────── */
+/* A small picture of the whole board with the part in view marked. It sits over the board's corner, above the nodes, and its
+   own pointer events never reach the board underneath (a click there moves the view, it does not start a pan). */
+.am-canvas-minimap {
+  position: absolute; inset-block-end: 12px; inset-inline-start: 12px; z-index: 7;
+  padding: 4px; line-height: 0;
+  background: color-mix(in oklab, var(--paper) 88%, transparent);
+  border: var(--bw) solid var(--line-2); border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+.am-canvas-minimap[hidden] { display: none; }
+.am-canvas-minimap svg { display: block; cursor: crosshair; touch-action: none; }
+.am-mini-node { fill: var(--ink-3); }
+.am-mini-view {
+  fill: color-mix(in oklab, var(--accent) 12%, transparent);
+  stroke: var(--accent); stroke-width: 1;
+}
