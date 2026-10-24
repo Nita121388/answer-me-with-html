@@ -585,3 +585,36 @@ test('canvas: holding space does not swallow an ordinary click', { skip: SKIP, t
   await new Promise((r) => setTimeout(r, 250));
   assert.equal(await commentOpen(), !before, 'the click after the release works');
 });
+
+test('canvas: a space-drag marks no text, and text is still selectable without the space', { skip: SKIP, timeout: 90000 }, async () => {
+  await clearArrangement();
+  await clearFolds();
+  await open();
+  const spaceKey = (type) => page('Input.dispatchKeyEvent', { type, key: ' ', code: 'Space', windowsVirtualKeyCode: 32, nativeVirtualKeyCode: 32 });
+  const selected = () => evaluate('String(window.getSelection() ?? "")');
+  const spot = (sel) => evaluate(`(() => {
+    const b = document.querySelector(${JSON.stringify(sel)}).getBoundingClientRect();
+    return JSON.stringify({ x: Math.round(b.left + 5), y: Math.round(b.top + b.height / 2) });
+  })()`).then(JSON.parse);
+
+  // The body text is the case that used to go wrong: a press there is a press on selectable text.
+  const body = await spot('#panel-B .am-panel-body p');
+  await spaceKey('keyDown');
+  await mouse('mousePressed', body.x, body.y);
+  await mouse('mouseMoved', body.x + 70, body.y + 5);
+  await mouse('mouseMoved', body.x + 240, body.y + 10);
+  assert.equal(await selected(), '', 'a pan marks no text');
+  await mouse('mouseReleased', body.x + 240, body.y + 10);
+  await spaceKey('keyUp');
+  await new Promise((r) => setTimeout(r, 150));
+  assert.equal(await selected(), '', 'nothing is left marked after the pan');
+
+  // Without the space the text is selectable again, so it can still be copied.
+  const body2 = await spot('#panel-A .am-panel-body p');
+  await mouse('mousePressed', body2.x, body2.y);
+  await mouse('mouseMoved', body2.x + 60, body2.y);
+  await mouse('mouseMoved', body2.x + 120, body2.y);
+  await mouse('mouseReleased', body2.x + 120, body2.y);
+  assert.notEqual(await selected(), '', 'a plain drag still selects text');
+  await evaluate('window.getSelection().removeAllRanges()');
+});

@@ -34,6 +34,10 @@ html[data-am-space] .am-canvas-viewport,
 html[data-am-space] .am-canvas .am-panel-head,
 html[data-am-space] .am-canvas-port { cursor: grab; }
 html[data-am-space][data-am-panning] .am-canvas-viewport { cursor: grabbing; }
+/* While the space is held the board is a hand tool, so nothing on it is selectable: a press is the start of a pan, and a pan
+   must never turn into a text selection. Releasing the space makes the text selectable again. */
+html[data-am-space] .am-canvas,
+html[data-am-space] .am-canvas * { user-select: none; -webkit-user-select: none; }
 
 /* No script: the viewport scrolls instead of panning, so every node is reachable. */
 html:not([data-canvas-live]) .am-canvas-viewport { overflow: auto; cursor: auto; }

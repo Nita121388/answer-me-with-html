@@ -574,6 +574,9 @@
       paintBox();
       return;
     }
+    // A pan is not a selection: stopping the default here keeps the browser from marking text under the pointer, which the
+    // user-select rules above cannot undo once it has started.
+    e.preventDefault();
     panning = true;
     panId = e.pointerId;
     panFrom = { x: e.clientX - x, y: e.clientY - y };
