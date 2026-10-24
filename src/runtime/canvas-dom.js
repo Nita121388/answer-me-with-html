@@ -421,7 +421,10 @@
     }, true);
 
     head.addEventListener('pointerdown', (e) => {
-      if (e.button !== 0 || e.target.closest('[data-am="canvas-port"]')) return;
+      // A press on a control in the head — the comment button, the drag grip, the port — belongs to that control. Taking the
+      // pointer for a drag would retarget the click that follows to the head, and a control in a folded head is a summary, so the
+      // panel would fold instead of the control doing its job.
+      if (e.button !== 0 || e.target.closest('button, a, input, textarea, select, label')) return;
       // Keep the press away from the viewport's pan (the head is a summary on a board with folds).
       e.stopPropagation();
       // A press on a node that is already in the selection carries the whole selection; a press on any other node takes the
@@ -526,7 +529,9 @@
     // A press that starts on a node belongs to the node; a press on an edge selects it (the layer's own handler). A press on the
     // toolbar or the minimap belongs to those: capturing the pointer for a pan would retarget the click to the viewport, and the
     // button would never see it.
-    if (e.button !== 0 || panning || box || e.target.closest('.am-canvas-edge, .am-canvas-zoom, .am-canvas-minimap')) return;
+    // A press inside a node belongs to the node or to a control in it, never to the board: taking the pointer here would
+    // swallow the click that control was waiting for (the node's own handler stops the press, but it lets a control through).
+    if (e.button !== 0 || panning || box || e.target.closest('.am-canvas-edge, .am-canvas-zoom, .am-canvas-minimap, .am-canvas-node')) return;
     if (e.shiftKey) {
       // Shift extends the selection, so the box starts from what is already selected.
       const r = viewport.getBoundingClientRect();

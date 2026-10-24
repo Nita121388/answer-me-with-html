@@ -93,6 +93,11 @@ const board = () => evaluate(`(() => {
 })()`).then(JSON.parse);
 
 const selectedIds = () => evaluate(`JSON.stringify([...document.querySelectorAll('.am-canvas-node.is-selected')].map((n) => n.id))`).then(JSON.parse);
+// The centre of any element on the page, so a check can press the real thing.
+const rectOf = (sel) => evaluate(`(() => {
+  const b = document.querySelector(${JSON.stringify(sel)}).getBoundingClientRect();
+  return JSON.stringify({ x: Math.round(b.left + b.width / 2), y: Math.round(b.top + b.height / 2) });
+})()`).then(JSON.parse);
 const clearSelectionAll = () => evaluate(`document.querySelector('.am-canvas-viewport').click()`);
 const headAt = (id) => evaluate(`(() => {
   const r = document.getElementById('${id}').querySelector('.am-panel-head').getBoundingClientRect();
@@ -100,6 +105,8 @@ const headAt = (id) => evaluate(`(() => {
 })()`).then(JSON.parse);
 
 const clearArrangement = () => evaluate(`localStorage.removeItem(${storeKeyExpr})`);
+// A fold is remembered per page too, and an earlier test may have left one closed.
+const clearFolds = () => evaluate(`(() => { for (const k of Object.keys(localStorage)) if (k.startsWith('am-fold:')) localStorage.removeItem(k); return true; })()`);
 const dragNode = async (id, dx, dy) => {
   const head = await headAt(id);
   await mouse('mousePressed', head.x, head.y);
@@ -470,3 +477,46 @@ test('canvas: a real press on the zoom buttons is not swallowed by the board pan
   await new Promise((r) => setTimeout(r, 300));
   assert.notEqual(await evaluate(`document.querySelector('[data-am="canvas-zoom-value"]').textContent`), zoomed, 'a real click on Fit fitted the board again');
 });
+
+test('canvas: on a foldable board the comment button, the port and the head each do their own job', { skip: SKIP, timeout: 90000 }, async () => {
+  await clearArrangement();
+  await clearFolds();
+  await open();
+  const foldOpen = () => evaluate(`document.getElementById('panel-A').querySelector('.am-fold').open`);
+  const commentOpen = () => evaluate(`(() => { const w = document.querySelector('#panel-A .am-comment'); return Boolean(w && !w.hidden); })()`);
+  const press = async (sel) => {
+    const p = await rectOf(sel);
+    await mouse('mousePressed', p.x, p.y);
+    await mouse('mouseReleased', p.x, p.y);
+    await new Promise((r) => setTimeout(r, 300));
+  };
+
+  // The comment button opens the box and does not fold the panel it lives in.
+  await press('#panel-A .am-comment-btn');
+  assert.equal(await commentOpen(), true, 'the comment box opened');
+  assert.equal(await foldOpen(), true, 'and the panel did not fold');
+  assert.equal(await evaluate('document.activeElement.tagName'), 'TEXTAREA', 'focus went into the box');
+
+  // A second press closes it, again without folding.
+  await press('#panel-A .am-comment-btn');
+  assert.equal(await commentOpen(), false, 'the box closed');
+  assert.equal(await foldOpen(), true, 'still not folded');
+
+  // The port starts an edge even though the head it sits next to is a summary.
+  const port = await rectOf('#panel-A [data-am="canvas-port"]');
+  const target = await rectOf('#panel-C .am-panel-head');
+  await mouse('mousePressed', port.x, port.y);
+  await mouse('mouseMoved', port.x + 20, port.y + 20);
+  await mouse('mouseMoved', target.x, target.y);
+  await mouse('mouseReleased', target.x, target.y);
+  await new Promise((r) => setTimeout(r, 300));
+  assert.ok((await edgesIds()).includes('panel-A>panel-C'), 'the port drew an edge to C');
+  assert.equal(await foldOpen(), true, 'drawing an edge did not fold the panel');
+
+  // And a press on the head itself still folds it.
+  await press('#panel-A .am-panel-head h2');
+  assert.equal(await foldOpen(), false, 'a click on the head folds the panel');
+});
+
+// The edges as "panel-A>panel-B", for a check that does not care about labels.
+const edgesIds = () => evaluate(`JSON.stringify([...document.querySelectorAll('.am-canvas-edge')].map((g) => g.dataset.from + '>' + g.dataset.to))`).then(JSON.parse);

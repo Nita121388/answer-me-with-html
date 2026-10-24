@@ -173,6 +173,9 @@ html[data-am-dragging] .am-panel--moving { opacity: .45; outline: 2px dashed var
 .am-panel-meta + .am-comment-btn { margin-inline-start: 0; }
 .am-panel:hover .am-comment-btn, .am-comment-btn:focus-visible, .am-comment-btn[aria-expanded="true"] { border-color: var(--line-2); color: var(--ink-2); }
 .am-panel .am-comment-btn.am-comment-btn--on { color: var(--accent); border-color: var(--accent); }
+/* The icon is painted, never hit: the browser decides whether a click folds the panel from the element it landed on, and an
+   <svg> is not an interactive element, so an icon that took the pointer would fold the panel instead of opening the comment. */
+.am-comment-btn > svg { pointer-events: none; }
 .am-panel--bare { position: relative; }
 .am-panel--bare > .am-comment-btn { position: absolute; top: 4px; inset-inline-end: 0; }
 .am-comment { padding: 0 14px 12px; }

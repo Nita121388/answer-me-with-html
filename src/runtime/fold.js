@@ -49,6 +49,17 @@
 
   const replan = () => window.dispatchEvent(new Event('am-replan'));
 
+  // A fold can make the head a <summary>, and a click on a <summary> folds the panel unless the click lands on an interactive
+  // element. The comment button is such an element, but its icon is an <svg>, and the browser decides from the element that was
+  // actually hit: an icon that swallows the pointer would fold the panel instead of opening the comment. So the icon is painted
+  // but never hit, and the button under it is.
+  for (const fold of folds) {
+    fold.addEventListener('click', (e) => {
+      const control = e.target.closest?.('button, a, input, textarea, select, label');
+      if (control && fold.querySelector('summary')?.contains(control)) e.preventDefault();
+    }, true);
+  }
+
   for (const fold of folds) {
     fold.addEventListener('toggle', () => {
       if (restoring) return;
