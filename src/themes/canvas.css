@@ -47,8 +47,13 @@ html:not([data-canvas-live]) .am-canvas-viewport { overflow: auto; cursor: auto;
   display: block;
   box-shadow: var(--shadow);
 }
-/* The head is the handle: press it and drag the node anywhere on the board. */
-.am-canvas .am-panel-head { cursor: grab; touch-action: none; }
+/* The head is the handle: press it and drag the node anywhere on the board. Text is not selectable there, because a
+   press on it is the start of a move, and a move must not turn into a text selection (the reader would lose the drag). */
+.am-canvas .am-panel-head { cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none; }
+
+/* While a node is being dragged, a port is being pulled, or the board is being panned, nothing on the board is selectable:
+   the pointer is a handle for the duration of the gesture, not a text cursor. */
+html[data-am-canvas-drag], html[data-am-canvas-drag] * { user-select: none; -webkit-user-select: none; }
 html[data-am-panning] .am-canvas .am-panel-head { cursor: grabbing; }
 .am-canvas .am-panel-head:active { cursor: grabbing; }
 .am-canvas-node:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }

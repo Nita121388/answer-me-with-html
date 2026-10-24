@@ -326,6 +326,7 @@
     linkPath.setAttribute('d', pathFor({ ...a }, { x: a.x + a.w + 1, y: a.y + 24, w: 1, h: 1 }));
     moveLink(e);
     html.setAttribute('data-am-linking', '');
+    html.setAttribute('data-am-canvas-drag', '');
   };
   const moveLink = (e) => {
     if (!linking) return;
@@ -340,6 +341,7 @@
     linking.path.remove();
     linking = null;
     html.removeAttribute('data-am-linking');
+    html.removeAttribute('data-am-canvas-drag');
     const target = document.elementFromPoint(e.clientX, e.clientY)?.closest('.am-canvas-node');
     if (!target || target.id === from) return;
     if (edges.some((edge) => edge.from === from && edge.to === target.id)) return;
@@ -368,6 +370,7 @@
         linking?.path.remove();
         linking = null;
         html.removeAttribute('data-am-linking');
+    html.removeAttribute('data-am-canvas-drag');
       });
     }
   }
@@ -380,22 +383,36 @@
     let moveId = null;
     let grab = null;
     let start = null;
+    let moved = false;
+    // On a board with folds the head is a summary as well as the drag handle, so a press that turns into a move would end as a
+    // click on that summary and fold the panel the reader just carried. The flag cancels exactly that one click.
+    let cancelFoldClick = false;
+
+    head.addEventListener('click', (e) => {
+      if (!cancelFoldClick) return;
+      e.preventDefault();
+      e.stopPropagation();
+    }, true);
 
     head.addEventListener('pointerdown', (e) => {
       if (e.button !== 0 || e.target.closest('[data-am="canvas-port"]')) return;
-      // Keep the press away from the viewport's pan and from a fold toggle (the head is a summary on a canvas with folds).
+      // Keep the press away from the viewport's pan (the head is a summary on a board with folds).
       e.stopPropagation();
       moving = true;
+      moved = false;
       moveId = e.pointerId;
       start = { x: e.clientX, y: e.clientY };
       const left = parseFloat(node.style.left) || 0;
       const top = parseFloat(node.style.top) || 0;
       grab = { dx: e.clientX - left * scale - x, dy: e.clientY - top * scale - y };
       node.setAttribute('data-am-node-moving', '');
+      html.setAttribute('data-am-canvas-drag', '');
       head.setPointerCapture?.(e.pointerId);
     });
     head.addEventListener('pointermove', (e) => {
       if (!moving || e.pointerId !== moveId) return;
+      if (!moved && Math.hypot(e.clientX - start.x, e.clientY - start.y) < 4) return;
+      moved = true;
       e.preventDefault();
       // The node lives in stage units, the pointer in screen units: undo the pan and the zoom.
       node.style.left = `${Math.round((e.clientX - grab.dx - x) / scale)}px`;
@@ -407,9 +424,15 @@
       moving = false;
       moveId = null;
       node.removeAttribute('data-am-node-moving');
+      html.removeAttribute('data-am-canvas-drag');
       try {
         head.releasePointerCapture(e.pointerId);
       } catch {}
+      if (moved) {
+        // The click that follows this release belongs to the move, not to the fold.
+        cancelFoldClick = true;
+        setTimeout(() => { cancelFoldClick = false; }, 60);
+      }
       save();
     };
     head.addEventListener('pointerup', endMove);
@@ -445,6 +468,7 @@
     panId = e.pointerId;
     panFrom = { x: e.clientX - x, y: e.clientY - y };
     html.setAttribute('data-am-panning', '');
+    html.setAttribute('data-am-canvas-drag', '');
     viewport.setPointerCapture?.(e.pointerId);
   });
   viewport.addEventListener('pointermove', (e) => {
@@ -458,6 +482,7 @@
     panning = false;
     panId = null;
     html.removeAttribute('data-am-panning');
+    html.removeAttribute('data-am-canvas-drag');
     try {
       viewport.releasePointerCapture(e.pointerId);
     } catch {}

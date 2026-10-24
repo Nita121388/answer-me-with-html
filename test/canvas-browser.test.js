@@ -24,6 +24,7 @@ const MAX_SCALE = 2.5; // src/runtime/canvas-dom.js
 const DRAFT = `---
 title: Canvas board
 template: canvas
+collapse: true
 lang: en
 ---
 \`\`\`canvas
@@ -234,4 +235,53 @@ test('canvas: the keyboard moves a focused node', { skip: SKIP, timeout: 60000 }
   assert.equal(after.nodes.A.x, start.nodes.A.x + 20, 'two ArrowRight presses moved A 20px');
   assert.equal(after.nodes.A.y, start.nodes.A.y + 10, 'one ArrowDown press moved A 10px');
   assert.notEqual(after.paths['panel-A>panel-B'], start.paths['panel-A>panel-B'], 'the edge followed the key move');
+});
+
+test('canvas: dragging a node does not select its text, and the text is selectable again afterwards', { skip: SKIP, timeout: 60000 }, async () => {
+  await clearArrangement();
+  await open();
+  const head = await headAt('panel-B');
+  await mouse('mousePressed', head.x, head.y);
+  await mouse('mouseMoved', head.x, head.y);
+  await mouse('mouseMoved', head.x + 160, head.y + 90);
+  const during = await evaluate(`JSON.stringify({
+    drag: document.documentElement.hasAttribute('data-am-canvas-drag'),
+    userSelect: getComputedStyle(document.querySelector('#panel-B .am-panel-body')).userSelect,
+    selected: String(window.getSelection() ?? ''),
+  })`).then(JSON.parse);
+  assert.equal(during.drag, true, 'the gesture is marked');
+  assert.equal(during.userSelect, 'none', 'nothing on the board is selectable while a node moves');
+  assert.equal(during.selected, '', 'a move never turns into a text selection');
+  await mouse('mouseReleased', head.x + 160, head.y + 90);
+  await new Promise((r) => setTimeout(r, 150));
+  const after = await evaluate(`JSON.stringify({
+    drag: document.documentElement.hasAttribute('data-am-canvas-drag'),
+    userSelect: getComputedStyle(document.querySelector('#panel-B .am-panel-body')).userSelect,
+  })`).then(JSON.parse);
+  assert.equal(after.drag, false, 'the gesture ends with the release');
+  assert.notEqual(after.userSelect, 'none', 'the body text is selectable again');
+});
+
+test('canvas: a press that moves a node does not also fold it, and a plain click still folds', { skip: SKIP, timeout: 60000 }, async () => {
+  await clearArrangement();
+  await open();
+  // The head is both the drag handle and the fold toggle, so a move must not leave the panel folded behind it.
+  const head = await headAt('panel-A');
+  await mouse('mousePressed', head.x, head.y);
+  await mouse('mouseMoved', head.x, head.y);
+  await mouse('mouseMoved', head.x + 150, head.y + 70);
+  await mouse('mouseReleased', head.x + 150, head.y + 70);
+  await new Promise((r) => setTimeout(r, 200));
+  const moved = await board();
+  assert.equal(moved.nodes.A.x, (await board()).nodes.A.x, 'A moved');
+  assert.ok(moved.nodes.A.x !== 20, 'A is not where the build put it');
+  // The drag must not fold the panel: the toggle only belongs to a click that stayed a click.
+  assert.equal(await evaluate(`document.getElementById('panel-A').querySelector('.am-fold').open`), true, 'A is still open after the move');
+
+  // And a plain click, with no movement, still folds it.
+  const now = await headAt('panel-A');
+  await mouse('mousePressed', now.x, now.y);
+  await mouse('mouseReleased', now.x, now.y);
+  await new Promise((r) => setTimeout(r, 200));
+  assert.equal(await evaluate(`document.getElementById('panel-A').querySelector('.am-fold').open`), false, 'a click folds');
 });
