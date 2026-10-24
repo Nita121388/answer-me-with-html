@@ -520,3 +520,68 @@ test('canvas: on a foldable board the comment button, the port and the head each
 
 // The edges as "panel-A>panel-B", for a check that does not care about labels.
 const edgesIds = () => evaluate(`JSON.stringify([...document.querySelectorAll('.am-canvas-edge')].map((g) => g.dataset.from + '>' + g.dataset.to))`).then(JSON.parse);
+
+test('canvas: holding space turns any drag into a pan, and lets go of the board when released', { skip: SKIP, timeout: 90000 }, async () => {
+  await clearArrangement();
+  await clearFolds();
+  await open();
+  const spaceKey = (type) => page('Input.dispatchKeyEvent', { type, key: ' ', code: 'Space', windowsVirtualKeyCode: 32, nativeVirtualKeyCode: 32 });
+  const state = () => evaluate(`JSON.stringify({
+    transform: document.querySelector('[data-canvas-stage]').style.transform,
+    holding: document.documentElement.hasAttribute('data-am-space'),
+    node: [parseFloat(document.getElementById('panel-A').style.left), parseFloat(document.getElementById('panel-A').style.top)],
+    folded: document.getElementById('panel-A').querySelector('.am-fold').open,
+  })`).then(JSON.parse);
+
+  const before = await state();
+  await spaceKey('keyDown');
+  assert.equal(await evaluate(`document.documentElement.hasAttribute('data-am-space')`), true, 'the board says it is a hand tool');
+
+  // A drag that starts on a node's own head pans the board instead of moving the node or folding it.
+  const head = await rectOf('#panel-A .am-panel-head h2');
+  await mouse('mousePressed', head.x, head.y);
+  await mouse('mouseMoved', head.x, head.y);
+  await mouse('mouseMoved', head.x - 120, head.y + 90);
+  await mouse('mouseReleased', head.x - 120, head.y + 90);
+  await new Promise((r) => setTimeout(r, 250));
+  const panned = await state();
+  assert.notEqual(panned.transform, before.transform, 'the board panned');
+  assert.deepEqual(panned.node, before.node, 'the node did not move');
+  assert.equal(panned.folded, before.folded, 'and it did not fold');
+
+  await spaceKey('keyUp');
+  assert.equal(await evaluate(`document.documentElement.hasAttribute('data-am-space')`), false, 'the hand tool is released');
+
+  // Released, the same press on the head moves the node again: the space did not leave anything switched on.
+  const head2 = await rectOf('#panel-A .am-panel-head h2');
+  await mouse('mousePressed', head2.x, head2.y);
+  await mouse('mouseMoved', head2.x, head2.y);
+  await mouse('mouseMoved', head2.x + 70, head2.y);
+  await mouse('mouseReleased', head2.x + 70, head2.y);
+  await new Promise((r) => setTimeout(r, 250));
+  const moved = await state();
+  assert.equal(moved.node[0], before.node[0] + 70, 'the node moved again');
+});
+
+test('canvas: holding space does not swallow an ordinary click', { skip: SKIP, timeout: 90000 }, async () => {
+  await clearArrangement();
+  await clearFolds();
+  await open();
+  const spaceKey = (type) => page('Input.dispatchKeyEvent', { type, key: ' ', code: 'Space', windowsVirtualKeyCode: 32, nativeVirtualKeyCode: 32 });
+  const commentOpen = () => evaluate(`(() => { const w = document.querySelector('#panel-A .am-comment'); return Boolean(w && !w.hidden); })()`);
+
+  await spaceKey('keyDown');
+  const at = await rectOf('#panel-A .am-comment-btn');
+  await mouse('mousePressed', at.x, at.y);
+  await mouse('mouseReleased', at.x, at.y);
+  await spaceKey('keyUp');
+  await new Promise((r) => setTimeout(r, 250));
+  // The board is a hand tool while the space is held, so this is allowed to do nothing; what matters is that the release
+  // leaves the page in a state where the next click works.
+  const before = await commentOpen();
+  const at2 = await rectOf('#panel-A .am-comment-btn');
+  await mouse('mousePressed', at2.x, at2.y);
+  await mouse('mouseReleased', at2.x, at2.y);
+  await new Promise((r) => setTimeout(r, 250));
+  assert.equal(await commentOpen(), !before, 'the click after the release works');
+});

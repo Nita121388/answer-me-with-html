@@ -327,6 +327,7 @@
   // here with its propagation stopped: the viewport would otherwise take the pointer capture for a pan and the click would
   // never reach the path.
   layer.addEventListener('pointerdown', (e) => {
+    if (space) return;
     const g = e.target.closest('.am-canvas-edge');
     if (!g) return;
     e.stopPropagation();
@@ -380,6 +381,7 @@
     const port = node.querySelector('[data-am="canvas-port"]');
     if (port) {
       port.addEventListener('pointerdown', (e) => {
+        if (space) return;
         e.preventDefault();
         e.stopPropagation();
         port.setPointerCapture?.(e.pointerId);
@@ -421,6 +423,8 @@
     }, true);
 
     head.addEventListener('pointerdown', (e) => {
+      // The space is held: the press pans the board, so the node neither takes it nor stops it.
+      if (space) return;
       // A press on a control in the head — the comment button, the drag grip, the port — belongs to that control. Taking the
       // pointer for a drag would retarget the click that follows to the head, and a control in a folded head is a summary, so the
       // panel would fold instead of the control doing its job.
@@ -490,6 +494,32 @@
   for (const fold of stage.querySelectorAll('.am-fold')) fold.addEventListener('toggle', redrawEdges);
 
   // ---- panning and the marquee ----
+  // The space bar is the board's grab handle: while it is held, a press anywhere on the board pans it, wherever the press
+  // started, and no node drag, edge click or marquee competes for it. It is one gesture per press, so a repeated keydown is
+  // ignored; keyup ends it.
+  let space = false;
+  const setSpace = (on) => {
+    if (space === on) return;
+    space = on;
+    if (on) html.setAttribute('data-am-space', '');
+    else html.removeAttribute('data-am-space');
+  };
+  const typing = () => {
+    const el = document.activeElement;
+    return Boolean(el && (el.tagName === 'TEXTAREA' || el.tagName === 'INPUT' || el.isContentEditable));
+  };
+  addEventListener('keydown', (e) => {
+    if (e.code !== 'Space' || e.repeat || typing()) return;
+    // The space bar would scroll the page; on a board it is a hand tool instead.
+    e.preventDefault();
+    setSpace(true);
+  });
+  addEventListener('keyup', (e) => {
+    if (e.code === 'Space') setSpace(false);
+  });
+  // A page that loses focus while the space is held must not stay a hand tool.
+  addEventListener('blur', () => setSpace(false));
+
   // A plain drag on the empty board pans it; shift and drag draws a box and selects every node it touches, which is how a
   // reader takes several panels at once. A plain click on the empty board clears the selection.
   let panning = false;
@@ -531,8 +561,10 @@
     // button would never see it.
     // A press inside a node belongs to the node or to a control in it, never to the board: taking the pointer here would
     // swallow the click that control was waiting for (the node's own handler stops the press, but it lets a control through).
-    if (e.button !== 0 || panning || box || e.target.closest('.am-canvas-edge, .am-canvas-zoom, .am-canvas-minimap, .am-canvas-node')) return;
-    if (e.shiftKey) {
+    if (e.button !== 0 || panning || box) return;
+    // The space is held: this press pans the board, whatever it landed on.
+    if (!space && e.target.closest('.am-canvas-edge, .am-canvas-zoom, .am-canvas-minimap, .am-canvas-node')) return;
+    if (e.shiftKey && !space) {
       // Shift extends the selection, so the box starts from what is already selected.
       const r = viewport.getBoundingClientRect();
       box = { from: { x: e.clientX - r.left, y: e.clientY - r.top }, to: { x: e.clientX - r.left, y: e.clientY - r.top }, id: e.pointerId };

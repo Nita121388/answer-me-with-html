@@ -29,6 +29,11 @@
   cursor: grab; touch-action: none;
 }
 html[data-am-panning] .am-canvas-viewport { cursor: grabbing; }
+/* The space bar is the grab handle: the whole board says so while it is held, so a reader can see the mode. */
+html[data-am-space] .am-canvas-viewport,
+html[data-am-space] .am-canvas .am-panel-head,
+html[data-am-space] .am-canvas-port { cursor: grab; }
+html[data-am-space][data-am-panning] .am-canvas-viewport { cursor: grabbing; }
 
 /* No script: the viewport scrolls instead of panning, so every node is reachable. */
 html:not([data-canvas-live]) .am-canvas-viewport { overflow: auto; cursor: auto; }
