@@ -158,7 +158,9 @@ Selection rules:
 - One panel, one question. With more than 8 panels, split the page or cut panels.
 - On a `canvas` page the edges are a `canvas` fence in the intro, before the first panel: one `A -> B` or `A -> B: label`
   per line. Prefer quoted titles ("First idea" -> "Second idea"): an id is a letter assigned by position, so inserting a panel
-  above re-letters the ones below it and every edge written by letter then points somewhere else. Panels are placed by the graph; `{x=120 y=40}` pins one to that spot.
+  above re-letters the ones below it and every edge written by letter then points somewhere else.
+- The reader can pan and zoom the board, drag any panel, draw and delete edges, and shift-drag on the empty board to select
+  several panels and move them together. A canvas page also exports a `.drawio` file (draw.io / diagrams.net). Panels are placed by the graph; `{x=120 y=40}` pins one to that spot.
 - `{collapse}` makes this panel a fold even when the page does not set `collapse: true`; `{collapsed}` also starts it closed.
   A fold is a native `<details>`, so it opens and closes with no script, works from the keyboard, and prints open.
   A `{bare}` panel has no head, so it never folds.

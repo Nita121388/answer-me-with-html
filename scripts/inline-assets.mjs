@@ -1,7 +1,7 @@
 // esbuild plugin shared by the CLI bundle (scripts/build.mjs) and the website's browser engine (site/build.mjs).
 // It replaces src/assets.js with inline strings, removing the runtime dependency on files on disk.
 import { readFileSync } from 'node:fs';
-import { composeRuntime, unexport } from '../src/runtime/compose.js';
+import { composeRuntime, composeCanvas, unexport } from '../src/runtime/compose.js';
 import { composeMathCss } from '../src/themes/math-css.js';
 import { composeFontCss, FONT_NAMES } from '../src/themes/font-css.js';
 
@@ -28,7 +28,7 @@ export const inlineAssets = {
         `export const UPDATE_CSS = ${JSON.stringify(read('../src/themes/update.css'))};`,
         `export const UPDATE_JS = ${JSON.stringify(read('../src/runtime/update.js'))};`,
         `export const LIVE_JS = ${JSON.stringify(read('../src/runtime/live.js'))};`,
-        `export const CANVAS_JS = ${JSON.stringify(read('../src/runtime/canvas-dom.js'))};`,
+        `export const CANVAS_JS = ${JSON.stringify(composeCanvas((file) => read(`../src/runtime/${file}`)))};`,
         `export const CLOSE_AFTER_CSS = ${JSON.stringify(read('../src/themes/close-after-reply.css'))};`,
         `export const CLOSE_AFTER_JS = ${JSON.stringify(read('../src/runtime/close-after-reply.js'))};`,
         `export const VIDEO_CSS = ${JSON.stringify(read('../src/themes/video.css'))};`,

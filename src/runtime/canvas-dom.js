@@ -158,10 +158,9 @@
     if (selected) select([...layer.querySelectorAll('.am-canvas-edge')].find((x) => x.dataset.key === selected), true);
   };
 
-  // Only the geometry of an edge moved: rewrite its path, and the label's place, without rebuilding the DOM.
-  const moveEdgesOf = (node) => {
+  // Only the geometry moved: rewrite the paths and the label places without rebuilding the DOM.
+  const redrawEdges = () => {
     for (const g of layer.querySelectorAll('.am-canvas-edge')) {
-      if (g.dataset.from !== node.id && g.dataset.to !== node.id) continue;
       const a = document.getElementById(g.dataset.from);
       const b = document.getElementById(g.dataset.to);
       if (!a || !b) continue;
@@ -174,6 +173,30 @@
         text.setAttribute('y', String(Math.round(m.y)));
       }
     }
+  };
+
+  // ---- the selection: one node, several, or none ----
+  // A marquee (shift and drag on the empty board) and a click both feed this set; every move applies to all of it, so a
+  // reader can take a handful of panels and carry them together.
+  const selection = new Set();
+  const setSelection = (list, additive = false) => {
+    if (!additive) for (const n of selection) n.classList.remove('is-selected');
+    if (!additive) selection.clear();
+    for (const n of list) {
+      selection.add(n);
+      n.classList.add('is-selected');
+    }
+  };
+  const clearSelection = () => setSelection([]);
+  const nudge = (dx, dy) => {
+    if (!selection.size) return false;
+    for (const n of selection) {
+      n.style.left = `${(parseFloat(n.style.left) || 0) + dx}px`;
+      n.style.top = `${(parseFloat(n.style.top) || 0) + dy}px`;
+    }
+    redrawEdges();
+    save();
+    return true;
   };
 
   // Stored by text key, so a re-render that keeps a panel keeps its place and its edges even when its letter changed.
@@ -381,9 +404,9 @@
     if (!head) continue;
     let moving = false;
     let moveId = null;
-    let grab = null;
     let start = null;
     let moved = false;
+    let carried = [];
     // On a board with folds the head is a summary as well as the drag handle, so a press that turns into a move would end as a
     // click on that summary and fold the panel the reader just carried. The flag cancels exactly that one click.
     let cancelFoldClick = false;
@@ -398,13 +421,14 @@
       if (e.button !== 0 || e.target.closest('[data-am="canvas-port"]')) return;
       // Keep the press away from the viewport's pan (the head is a summary on a board with folds).
       e.stopPropagation();
+      // A press on a node that is already in the selection carries the whole selection; a press on any other node takes the
+      // selection to itself, unless shift adds it to what is already selected.
+      if (!selection.has(node)) setSelection([node], e.shiftKey);
       moving = true;
       moved = false;
       moveId = e.pointerId;
       start = { x: e.clientX, y: e.clientY };
-      const left = parseFloat(node.style.left) || 0;
-      const top = parseFloat(node.style.top) || 0;
-      grab = { dx: e.clientX - left * scale - x, dy: e.clientY - top * scale - y };
+      carried = [...selection].map((n) => ({ n, left: parseFloat(n.style.left) || 0, top: parseFloat(n.style.top) || 0 }));
       node.setAttribute('data-am-node-moving', '');
       html.setAttribute('data-am-canvas-drag', '');
       head.setPointerCapture?.(e.pointerId);
@@ -415,9 +439,13 @@
       moved = true;
       e.preventDefault();
       // The node lives in stage units, the pointer in screen units: undo the pan and the zoom.
-      node.style.left = `${Math.round((e.clientX - grab.dx - x) / scale)}px`;
-      node.style.top = `${Math.round((e.clientY - grab.dy - y) / scale)}px`;
-      moveEdgesOf(node);
+      const dx = (e.clientX - start.x) / scale;
+      const dy = (e.clientY - start.y) / scale;
+      for (const item of carried) {
+        item.n.style.left = `${Math.round(item.left + dx)}px`;
+        item.n.style.top = `${Math.round(item.top + dy)}px`;
+      }
+      redrawEdges();
     });
     const endMove = (e) => {
       if (!moving || e.pointerId !== moveId) return;
@@ -446,24 +474,64 @@
       const dy = e.key === 'ArrowUp' ? -step : e.key === 'ArrowDown' ? step : 0;
       if (!dx && !dy) return;
       e.preventDefault();
-      node.style.left = `${(parseFloat(node.style.left) || 0) + dx}px`;
-      node.style.top = `${(parseFloat(node.style.top) || 0) + dy}px`;
-      moveEdgesOf(node);
-      save();
+      // The keyboard moves the whole selection, like the pointer does.
+      if (!selection.has(node)) setSelection([node]);
+      nudge(dx, dy);
     });
   }
 
   // A fold makes a node shorter, so the edges that touch it are drawn again.
-  for (const fold of stage.querySelectorAll('.am-fold')) fold.addEventListener('toggle', () => moveEdgesOf(fold.closest('.am-canvas-node')));
+  for (const fold of stage.querySelectorAll('.am-fold')) fold.addEventListener('toggle', redrawEdges);
 
-  // ---- panning ----
+  // ---- panning and the marquee ----
+  // A plain drag on the empty board pans it; shift and drag draws a box and selects every node it touches, which is how a
+  // reader takes several panels at once. A plain click on the empty board clears the selection.
   let panning = false;
   let panId = null;
   let panFrom = null;
+  let box = null;
+  let boxFrom = null;
+  const boxEl = document.createElement('div');
+  boxEl.className = 'am-canvas-marquee';
+  boxEl.hidden = true;
+  viewport.append(boxEl);
+
+  const boxRect = () => box && {
+    left: Math.min(box.from.x, box.to.x), top: Math.min(box.from.y, box.to.y),
+    right: Math.max(box.from.x, box.to.x), bottom: Math.max(box.from.y, box.to.y),
+  };
+  const paintBox = () => {
+    const r = boxRect();
+    if (!r) return boxEl.hidden = true;
+    boxEl.hidden = false;
+    boxEl.style.left = `${r.left}px`;
+    boxEl.style.top = `${r.top}px`;
+    boxEl.style.width = `${r.right - r.left}px`;
+    boxEl.style.height = `${r.bottom - r.top}px`;
+  };
+  // Every node whose box overlaps the marquee, in viewport coordinates.
+  const withinBox = () => {
+    const r = boxRect();
+    if (!r) return [];
+    return nodes.filter((n) => {
+      const b = n.getBoundingClientRect();
+      return b.right >= r.left && b.left <= r.right && b.bottom >= r.top && b.top <= r.bottom;
+    });
+  };
+
   viewport.addEventListener('pointerdown', (e) => {
-    // A press that starts on a node belongs to the node; the node handler stops it there.
-    // A press on an edge selects it (the layer's own handler); a press on a node belongs to the node.
-    if (e.button !== 0 || panning || e.target.closest('.am-canvas-edge')) return;
+    // A press that starts on a node belongs to the node; a press on an edge selects it (the layer's own handler).
+    if (e.button !== 0 || panning || box || e.target.closest('.am-canvas-edge')) return;
+    if (e.shiftKey) {
+      // Shift extends the selection, so the box starts from what is already selected.
+      const r = viewport.getBoundingClientRect();
+      box = { from: { x: e.clientX - r.left, y: e.clientY - r.top }, to: { x: e.clientX - r.left, y: e.clientY - r.top }, id: e.pointerId };
+      boxFrom = [...selection];
+      html.setAttribute('data-am-canvas-drag', '');
+      viewport.setPointerCapture?.(e.pointerId);
+      paintBox();
+      return;
+    }
     panning = true;
     panId = e.pointerId;
     panFrom = { x: e.clientX - x, y: e.clientY - y };
@@ -472,12 +540,35 @@
     viewport.setPointerCapture?.(e.pointerId);
   });
   viewport.addEventListener('pointermove', (e) => {
+    if (box && e.pointerId === box.id) {
+      const r = viewport.getBoundingClientRect();
+      box.to = { x: e.clientX - r.left, y: e.clientY - r.top };
+      gestureMoved = true;
+      paintBox();
+      setSelection([...new Set([...boxFrom, ...withinBox()])]);
+      return;
+    }
     if (!panning || e.pointerId !== panId) return;
+    gestureMoved = true;
     x = e.clientX - panFrom.x;
     y = e.clientY - panFrom.y;
     apply();
   });
+  const endBox = () => {
+    box = null;
+    boxFrom = null;
+    boxEl.hidden = true;
+    html.removeAttribute('data-am-canvas-drag');
+    redrawEdges();
+  };
   const endPan = (e) => {
+    if (box && (!e || e.pointerId === box.id)) {
+      try {
+        viewport.releasePointerCapture(box.id);
+      } catch {}
+      endBox();
+      return;
+    }
     if (!panning || e.pointerId !== panId) return;
     panning = false;
     panId = null;
@@ -533,6 +624,30 @@
     });
   }
 
+  // ---- export as a .drawio file ----
+  // drawioXml is a module (src/runtime/canvas-drawio.js), so the format is tested without a browser; the page gets it with the
+  // export keyword dropped, in front of this script (src/runtime/compose.js).
+  const readNode = (node) => ({
+    id: node.id,
+    title: (node.querySelector('.am-panel-head h2')?.textContent ?? '').trim(),
+    body: (node.querySelector('.am-panel-body')?.textContent ?? '').replace(/\s+/g, ' ').trim(),
+    x: parseFloat(node.style.left) || 0,
+    y: parseFloat(node.style.top) || 0,
+    w: node.offsetWidth,
+    h: node.offsetHeight,
+  });
+  const downloadDrawio = () => {
+    const title = document.title || 'board';
+    const blob = new Blob([drawioXml({ title, nodes: nodes.map(readNode), edges })], { type: 'application/xml' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = drawioFileName(title);
+    document.body.append(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  };
+
   const fit = () => {
     const r = viewport.getBoundingClientRect();
     const w = stage.offsetWidth;
@@ -564,6 +679,19 @@
   });
   document.querySelector('[data-am="canvas-fit"]')?.addEventListener('click', fit);
   document.querySelector('[data-am="canvas-reset"]')?.addEventListener('click', reset);
+  document.querySelector('[data-am="canvas-drawio"]')?.addEventListener('click', downloadDrawio);
+
+  // A plain click on the empty board clears the selection; Escape does the same and also drops a selected edge. The click that
+  // ends a marquee or a pan must not clear what the gesture just selected, so a gesture that moved leaves a flag behind.
+  let gestureMoved = false;
+  viewport.addEventListener('click', (e) => {
+    const moved = gestureMoved;
+    gestureMoved = false;
+    if (moved) return;
+    if (e.target.closest('.am-canvas-node') || e.target.closest('.am-canvas-edge')) return;
+    clearSelection();
+    select(layer.querySelector('.am-canvas-edge.is-selected'), false);
+  });
 
   addEventListener('keydown', (e) => {
     if (editing) return;
@@ -571,7 +699,10 @@
       e.preventDefault();
       return;
     }
-    if (e.key === 'Escape') select(layer.querySelector('.am-canvas-edge.is-selected'), false);
+    if (e.key === 'Escape') {
+      clearSelection();
+      select(layer.querySelector('.am-canvas-edge.is-selected'), false);
+    }
   });
 
   const saved = load();

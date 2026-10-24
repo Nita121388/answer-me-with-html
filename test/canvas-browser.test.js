@@ -92,6 +92,8 @@ const board = () => evaluate(`(() => {
   });
 })()`).then(JSON.parse);
 
+const selectedIds = () => evaluate(`JSON.stringify([...document.querySelectorAll('.am-canvas-node.is-selected')].map((n) => n.id))`).then(JSON.parse);
+const clearSelectionAll = () => evaluate(`document.querySelector('.am-canvas-viewport').click()`);
 const headAt = (id) => evaluate(`(() => {
   const r = document.getElementById('${id}').querySelector('.am-panel-head').getBoundingClientRect();
   return JSON.stringify({ x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) });
@@ -284,4 +286,80 @@ test('canvas: a press that moves a node does not also fold it, and a plain click
   await mouse('mouseReleased', now.x, now.y);
   await new Promise((r) => setTimeout(r, 200));
   assert.equal(await evaluate(`document.getElementById('panel-A').querySelector('.am-fold').open`), false, 'a click folds');
+});
+
+test('canvas: a shift-drag on the empty board selects several nodes and moves them together', { skip: SKIP, timeout: 60000 }, async () => {
+  await clearArrangement();
+  await open();
+  clearSelectionAll();
+  const a = (await board()).nodes.A;
+  const b = (await board()).nodes.B;
+  const c = (await board()).nodes.C;
+
+  // A box over B and C, drawn with shift, from the empty board next to them.
+  const r = JSON.parse(await evaluate(`JSON.stringify(document.querySelector('.am-canvas-viewport').getBoundingClientRect())`));
+  const to = (p) => evaluate(`(() => {
+    const stage = document.querySelector('[data-canvas-stage]');
+    const t = stage.style.transform.match(/translate\(([-0-9.]+)px, ([-0-9.]+)px\) scale\(([-0-9.]+)\)/);
+    const box = (id) => { const n = document.getElementById(id).getBoundingClientRect(); return { x: n.left, y: n.top }; };
+    return JSON.stringify({ b: box('panel-B'), c: box('panel-C') });
+  })()`).then(JSON.parse);
+  const pos = await to();
+  const x0 = Math.max(4, Math.min(pos.b.x, pos.c.x) - 30);
+  const y0 = Math.max(4, Math.min(pos.b.y, pos.c.y) - 30);
+  const x1 = Math.min(r.width - 4, Math.max(pos.b.x + 400, pos.c.x + 400) + 30);
+  const y1 = Math.min(r.height - 4, Math.max(pos.b.y + 200, pos.c.y + 200) + 30);
+  await page('Input.dispatchMouseEvent', { type: 'mousePressed', x: x0, y: y0, button: 'left', clickCount: 1, modifiers: 8 });
+  await page('Input.dispatchMouseEvent', { type: 'mouseMoved', x: x0 + 30, y: y0 + 30, button: 'left', modifiers: 8 });
+  await page('Input.dispatchMouseEvent', { type: 'mouseMoved', x: x1, y: y1, button: 'left', modifiers: 8 });
+  await page('Input.dispatchMouseEvent', { type: 'mouseReleased', x: x1, y: y1, button: 'left', modifiers: 8 });
+  await new Promise((r) => setTimeout(r, 200));
+  assert.deepEqual(await selectedIds(), ['panel-B', 'panel-C'], 'the box selected B and C');
+  assert.equal(await evaluate(`document.querySelector('.am-canvas-marquee').hidden`), true, 'the box is gone');
+
+  // Now press one of them and drag: both move, A does not.
+  const head = await headAt('panel-B');
+  await mouse('mousePressed', head.x, head.y);
+  await mouse('mouseMoved', head.x, head.y);
+  await mouse('mouseMoved', head.x + 90, head.y - 60);
+  await mouse('mouseReleased', head.x + 90, head.y - 60);
+  await new Promise((r) => setTimeout(r, 200));
+  const after = await board();
+  assert.equal(after.nodes.B.x, b.x + 90, 'B moved with the group');
+  assert.equal(after.nodes.B.y, b.y - 60, 'B moved up too');
+  assert.equal(after.nodes.C.x, c.x + 90, 'C moved with the group');
+  assert.equal(after.nodes.C.y, c.y - 60, 'C moved up too');
+  assert.deepEqual(after.nodes.A, a, 'A is untouched');
+  await clearSelectionAll();
+});
+
+
+test('canvas: the Export .drawio button saves a file named after the page, and the file is the board', { skip: SKIP, timeout: 60000 }, async () => {
+  await clearArrangement();
+  await open();
+  // Capture the blob instead of letting the browser download it: URL.createObjectURL is the one seam these two share.
+  const captured = await evaluate(`(async () => {
+    const original = URL.createObjectURL;
+    let blob = null;
+    let name = null;
+    URL.createObjectURL = (b) => { blob = b; return 'blob:captured'; };
+    const click = HTMLAnchorElement.prototype.click;
+    HTMLAnchorElement.prototype.click = function () { name = this.download; };
+    try {
+      document.querySelector('[data-am="canvas-drawio"]').click();
+    } finally {
+      URL.createObjectURL = original;
+      HTMLAnchorElement.prototype.click = click;
+    }
+    if (!blob) return JSON.stringify({ ok: false });
+    return JSON.stringify({ ok: true, name, size: blob.size, text: await blob.text() });
+  })()`).then(JSON.parse);
+
+  assert.equal(captured.ok, true, 'the button produced a file');
+  assert.match(captured.name, /\.drawio$/);
+  assert.equal(captured.name, 'Canvas board.drawio', 'the name is the page title');
+  assert.match(captured.text, /<mxfile /);
+  assert.equal((captured.text.match(/vertex="1"/g) ?? []).length, 3, 'one vertex per panel');
+  assert.equal((captured.text.match(/edge="1"/g) ?? []).length, 2, 'one edge per link');
+  assert.doesNotMatch(captured.text, /undefined|NaN/);
 });

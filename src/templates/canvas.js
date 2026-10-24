@@ -185,12 +185,14 @@ export function canvas({ meta, introHtml, panels, ui, language, edges = [] }) {
   const fit = c.fit ?? 'Fit';
   const reset = c.reset ?? 'Reset';
   const copyEdges = c.copyEdges ?? 'Copy edges';
+  const drawio = c.drawio ?? 'Export .drawio';
   const controls = `<div class="am-canvas-zoom">`
     + `<button class="am-btn" type="button" data-am="canvas-zoom-out" aria-label="${esc(zoomOut)}">−</button>`
     + `<span class="am-btn" data-am="canvas-zoom-value">100%</span>`
     + `<button class="am-btn" type="button" data-am="canvas-zoom-in" aria-label="${esc(zoomIn)}">+</button>`
     + `<button class="am-btn" type="button" data-am="canvas-fit">${esc(fit)}</button>`
     + `<button class="am-btn" type="button" data-am="canvas-copy-edges" hidden>${esc(copyEdges)}</button>`
+    + `<button class="am-btn" type="button" data-am="canvas-drawio">${esc(drawio)}</button>`
     + `<button class="am-btn" type="button" data-am="canvas-reset">${esc(reset)}</button>`
     + `</div>`;
   return `<main class="am-canvas" data-canvas>

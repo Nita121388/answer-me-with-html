@@ -1,4 +1,4 @@
-// The sheet page script: math-text.js around everything, then page.js, then the reply script with replyText, replyViewHtml (and the RTL_LETTER it reads) and remarkText, then the remark script, then the fold script, then the drag script, then the canvas script, then the layout planner and its DOM adapter.
+// The sheet page script: math-text.js around everything, then page.js, then the reply script with replyText, replyViewHtml (and the RTL_LETTER it reads) and remarkText, then the remark script, then the fold script, then the drag script, then the layout planner and its DOM adapter.
 // The fold script comes before the adapter on purpose: it restores the reader's folded panels, and the adapter measures the page at its own load.
 // replyText, replyViewHtml, remarkText, the math text helpers and planLayout are plain ES modules for tests; the page gets them with their `export` keyword dropped.
 // src/assets.js (development) and scripts/build.mjs (bundle) both call this with their own file reader, so the two cannot drift apart.
@@ -8,6 +8,14 @@ export { unexport };
 // reply-view.js imports RTL_LETTER from rtl-letter.js (the one definition src/bidi.js uses too); a page script has no imports, so the
 // page gets rtl-letter.js itself in front of reply-view.js and the import line is dropped.
 const unimport = (code) => code.replace(/^import \{[^}]*\} from '\.\/[\w-]+\.js';\r?\n/gm, '');
+
+// The canvas page script: the .drawio writer first (src/runtime/canvas-drawio.js, a plain module so the format is tested without a
+// browser), then the board itself. Both go into one inlined script, which is why the writer cannot be imported at run time.
+export function composeCanvas(read) {
+  const writer = unexport(read('canvas-drawio.js'));
+  const board = read('canvas-dom.js');
+  return `${writer}\n${board}`;
+}
 
 export function composeRuntime(read) {
   const scripts = `${read('page.js')}(() => {\n${unexport(read('reply-text.js'))}\n${unexport(read('rtl-letter.js'))}\n${unimport(unexport(read('reply-view.js')))}\n${read('reply.js')}})();\n(() => {\n${unexport(read('remark-text.js'))}\n${read('remark.js')}})();\n${read('fold.js')}
