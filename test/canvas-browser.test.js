@@ -182,16 +182,37 @@ test('canvas: the wheel zooms in and out about the pointer, and the label follow
   assert.deepEqual(zoomedOut.nodes, start.nodes, 'zooming moved no node');
 });
 
-test('canvas: a press on empty space pans the board, and the nodes stay where they were', { skip: SKIP, timeout: 60000 }, async () => {
+test('canvas: a plain drag on the empty board selects what it touches, and the board does not move', { skip: SKIP, timeout: 60000 }, async () => {
   await open();
   const start = await board();
-  await mouse('mousePressed', Math.round(DESKTOP / 2), HEIGHT - 60);
-  await mouse('mouseMoved', Math.round(DESKTOP / 2), HEIGHT - 60);
-  await mouse('mouseMoved', Math.round(DESKTOP / 2), HEIGHT - 260);
-  await mouse('mouseReleased', Math.round(DESKTOP / 2), HEIGHT - 260);
+  // An ordinary press on the empty board draws a selection box; panning is the space bar's and the middle button's job, so a
+  // press never moves the board by accident.
+  const vp = JSON.parse(await evaluate(`JSON.stringify(document.querySelector('.am-canvas-viewport').getBoundingClientRect())`));
+  // A start point that is really empty: no node, no control, no edge under it.
+  const from = await evaluate(`(() => {
+    const vp = document.querySelector('.am-canvas-viewport').getBoundingClientRect();
+    for (let y = vp.top + 20; y < vp.bottom - 20; y += 18) {
+      for (let x = vp.left + 20; x < vp.right - 20; x += 18) {
+        const el = document.elementFromPoint(x, y);
+        if (el && !el.closest('.am-canvas-node') && !el.closest('.am-canvas-zoom') && !el.closest('.am-canvas-minimap') && !el.closest('.am-canvas-edge')) {
+          return JSON.stringify({ x: Math.round(x), y: Math.round(y) });
+        }
+      }
+    }
+    return JSON.stringify(null);
+  })()`).then(JSON.parse);
+  assert.ok(from, 'the board has an empty spot to start from');
+  await mouse('mousePressed', from.x, from.y);
+  await mouse('mouseMoved', from.x + 10, from.y + 10);
+  // Far enough to cover every node on the board, not just the first two.
+  await mouse('mouseMoved', vp.right - 20, vp.bottom - 20);
+  await mouse('mouseReleased', vp.right - 20, vp.bottom - 20);
+  await new Promise((r) => setTimeout(r, 200));
   const after = await board();
-  assert.ok(Math.abs(after.y - start.y) > 100, `the board panned up: y ${start.y} -> ${after.y}`);
-  assert.deepEqual(after.nodes, start.nodes, 'panning moved no node');
+  assert.equal(after.x, start.x, `the board did not move: x ${start.x} -> ${after.x}`);
+  assert.equal(after.y, start.y, `the board did not move: y ${start.y} -> ${after.y}`);
+  assert.deepEqual(after.nodes, start.nodes, 'no node moved either');
+  assert.deepEqual(await selectedIds(), ['panel-A', 'panel-B', 'panel-C'], 'the box selected every node it covered');
 });
 
 test('canvas: a press on the minimap moves the view instead of panning the board', { skip: SKIP, timeout: 60000 }, async () => {
@@ -414,7 +435,7 @@ test('canvas: the minimap shows every node and the view, and a click on it moves
   assert.equal(mm.rects, 3, 'one rectangle per node');
   assert.equal(mm.view, true, 'the view rectangle is drawn');
   assert.ok(Number(mm.w) > 0 && Number(mm.h) > 0, `the picture has a size: ${mm.w}x${mm.h}`);
-  assert.ok(Number(mm.w) <= 168 && Number(mm.h) <= 168, 'the picture stays small');
+  assert.ok(Number(mm.w) <= 300 && Number(mm.h) <= 300, `the picture stays within its cap: ${mm.w}x${mm.h}`);
 
   const before = await board();
   // Click the far corner of the minimap: the view moves to the opposite end of the board.
@@ -617,4 +638,77 @@ test('canvas: a space-drag marks no text, and text is still selectable without t
   await mouse('mouseReleased', body2.x + 120, body2.y);
   assert.notEqual(await selected(), '', 'a plain drag still selects text');
   await evaluate('window.getSelection().removeAllRanges()');
+});
+
+test('canvas: panning is the space bar and the middle button, and nothing else moves the board', { skip: SKIP, timeout: 90000 }, async () => {
+  await clearArrangement();
+  await clearFolds();
+  await open();
+  const spaceKey = (type) => page('Input.dispatchKeyEvent', { type, key: ' ', code: 'Space', windowsVirtualKeyCode: 32, nativeVirtualKeyCode: 32 });
+  const boardX = () => board().then((b) => b.x);
+  const vp = JSON.parse(await evaluate(`JSON.stringify(document.querySelector('.am-canvas-viewport').getBoundingClientRect())`));
+  const from = { x: Math.round(vp.left + 30), y: Math.round(vp.top + 30) };
+  const dragTo = async (dx, dy, button = 'left') => {
+    await page('Input.dispatchMouseEvent', { type: 'mousePressed', x: from.x, y: from.y, button, clickCount: 1 });
+    await page('Input.dispatchMouseEvent', { type: 'mouseMoved', x: from.x + dx, y: from.y + dy, button });
+    await page('Input.dispatchMouseEvent', { type: 'mouseReleased', x: from.x + dx, y: from.y + dy, button, clickCount: 1 });
+    await new Promise((r) => setTimeout(r, 200));
+  };
+
+  // A plain drag moves nothing, so an ordinary press never pans the board by accident.
+  const start = await boardX();
+  await dragTo(120, 90);
+  assert.equal(await boardX(), start, 'a plain drag left the board where it was');
+
+  // The space bar pans.
+  await spaceKey('keyDown');
+  await dragTo(120, 90);
+  await spaceKey('keyUp');
+  assert.notEqual(await boardX(), start, 'a space-drag panned the board');
+
+  // The middle button pans too, for a mouse with one.
+  const afterSpace = await boardX();
+  await dragTo(80, 60, 'middle');
+  assert.notEqual(await boardX(), afterSpace, 'a middle-button drag panned the board');
+});
+
+test('canvas: full screen hides the head, and the toolbar and minimap never move with the board', { skip: SKIP, timeout: 90000 }, async () => {
+  await clearArrangement();
+  await open();
+  const geo = () => evaluate(`JSON.stringify({
+    head: getComputedStyle(document.querySelector('.am-canvas > .am-head')).display,
+    viewport: (() => { const r = document.querySelector('.am-canvas-viewport').getBoundingClientRect(); return [Math.round(r.top), Math.round(r.height)]; })(),
+    toolbar: (() => { const r = document.querySelector('.am-canvas-zoom').getBoundingClientRect(); return [Math.round(r.left), Math.round(r.top)]; })(),
+    minimap: (() => { const r = document.querySelector('.am-canvas-minimap').getBoundingClientRect(); return [Math.round(r.width), Math.round(r.height)]; })(),
+    fullscreen: document.documentElement.classList.contains('am-board-full'),
+  })`).then(JSON.parse);
+
+  const before = await geo();
+  assert.equal(before.fullscreen, false);
+
+  await evaluate(`document.querySelector('[data-am="canvas-fullscreen"]').click()`);
+  await new Promise((r) => setTimeout(r, 350));
+  const full = await geo();
+  assert.equal(full.fullscreen, true, 'the board is in full screen');
+  assert.equal(full.head, 'none', 'the head makes room for the board');
+  assert.equal(full.viewport[0], 0, 'the viewport starts at the top of the window');
+  assert.ok(full.viewport[1] >= before.viewport[1] + before.viewport[0] - 1, `the viewport takes what the head gave up: ${before.viewport.join('+')} -> ${full.viewport.join('/')}`);
+  assert.equal(await evaluate(`document.querySelector('[data-am="canvas-fullscreen"]').getAttribute('aria-pressed')`), 'true', 'the button says it is pressed');
+
+  // The minimap is bigger than the old fixed cap, and stays under a third of the window.
+  assert.ok(full.minimap[0] >= 200, `the minimap is readable: ${full.minimap.join('x')}`);
+  assert.ok(full.minimap[0] <= 300, `the minimap leaves the board room: ${full.minimap.join('x')}`);
+
+  // The controls are fixed to the window, so panning does not carry them away.
+  await page('Input.dispatchMouseEvent', { type: 'mousePressed', x: 200, y: 400, button: 'middle', clickCount: 1 });
+  await page('Input.dispatchMouseEvent', { type: 'mouseMoved', x: 420, y: 300, button: 'middle' });
+  await page('Input.dispatchMouseEvent', { type: 'mouseReleased', x: 420, y: 300, button: 'middle', clickCount: 1 });
+  await new Promise((r) => setTimeout(r, 200));
+  const panned = await geo();
+  assert.deepEqual(panned.toolbar, full.toolbar, 'the toolbar stayed put while the board panned');
+  assert.deepEqual(panned.minimap, full.minimap, 'the minimap stayed put too');
+
+  await evaluate(`document.querySelector('[data-am="canvas-fullscreen"]').click()`);
+  await new Promise((r) => setTimeout(r, 300));
+  assert.equal((await geo()).fullscreen, false, 'and full screen comes back off');
 });

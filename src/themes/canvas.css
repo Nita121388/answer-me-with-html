@@ -157,8 +157,24 @@ html:not([data-canvas-live]) .am-canvas-zoom { display: none; }
 }
 .am-canvas-minimap[hidden] { display: none; }
 .am-canvas-minimap svg { display: block; cursor: crosshair; touch-action: none; }
+/* The node rectangles and the view box are read at this size, so they need a weight that survives the scale. */
+.am-mini-node { stroke: var(--ink-3); stroke-width: 1; }
 .am-mini-node { fill: var(--ink-3); }
 .am-mini-view {
   fill: color-mix(in oklab, var(--accent) 12%, transparent);
   stroke: var(--accent); stroke-width: 1;
 }
+
+/* ── Full screen ───────────────────────────── */
+/* The page's own mode, toggled by the toolbar button: the head is hidden, the board takes the window. The real full-screen API
+   is asked for on top; where it is refused, this class is what the reader gets, so the button always does something. */
+html.am-board-full { overflow: hidden; }
+html.am-board-full body { overflow: hidden; }
+html.am-board-full .am-canvas {
+  min-height: 100vh; height: 100vh; padding: 0;
+}
+html.am-board-full .am-canvas > .am-head { display: none; }
+html.am-board-full .am-canvas-viewport { border-radius: 0; border: 0; }
+/* The document's own full screen: the board is the whole screen and the viewport fills it. */
+.am-canvas:fullscreen { width: 100vw; height: 100vh; padding: 0; background: var(--bg); }
+.am-canvas:fullscreen .am-canvas-viewport { flex: 1 1 auto; border-radius: 0; border: 0; }

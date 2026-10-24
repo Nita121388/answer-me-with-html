@@ -52,7 +52,7 @@ test('canvas placement: a panel no edge reaches still gets a place', () => {
 
 test('canvas: a canvas page renders the stage, the edges and the zoom controls', () => {
   const { html } = renderDoc(['---', 'title: Board', 'template: canvas', 'lang: en', '---', '```canvas', 'A -> B: causes', 'B -> C', '```', 'Lead.', '', '## A One', 'Text.', '', '## B Two', 'Text.', '', '## C Three', 'Text.'].join('\n'));
-  assert.match(html, /<main class="am-canvas" data-canvas>/);
+  assert.match(html, /<main class="am-canvas" data-canvas data-labels="/);
   const markup = html.replace(/<style>[\s\S]*?<\/style>/g, '').replace(/<script>[\s\S]*<\/script>/g, '');
   assert.equal((markup.match(/class="am-canvas-node /g) || []).length, 3, 'one node per panel');
   assert.equal((markup.match(/class="am-canvas-edge"/g) || []).length, 2);

@@ -186,6 +186,7 @@ export function canvas({ meta, introHtml, panels, ui, language, edges = [] }) {
   const reset = c.reset ?? 'Reset';
   const copyEdges = c.copyEdges ?? 'Copy edges';
   const drawio = c.drawio ?? 'Export .drawio';
+  const fullscreen = c.fullscreen ?? 'Full screen';
   // The controls live in the viewport, not in the stage: the stage is what the board's transform scales, so a button inside
   // it would be 15px wide at a 16% fit and no one could click it. They are placed once here, before the script moves anything.
   const controls = `<div class="am-canvas-zoom">`
@@ -195,12 +196,15 @@ export function canvas({ meta, introHtml, panels, ui, language, edges = [] }) {
     + `<button class="am-btn" type="button" data-am="canvas-fit">${esc(fit)}</button>`
     + `<button class="am-btn" type="button" data-am="canvas-copy-edges" hidden>${esc(copyEdges)}</button>`
     + `<button class="am-btn" type="button" data-am="canvas-drawio">${esc(drawio)}</button>`
+    + `<button class="am-btn" type="button" data-am="canvas-fullscreen" aria-pressed="false">${esc(fullscreen)}</button>`
     + `<button class="am-btn" type="button" data-am="canvas-reset">${esc(reset)}</button>`
     + `</div>`;
   // The minimap: a small picture of the whole board with the part in view marked, so a reader on a board wider than the screen
   // knows where they are and can jump anywhere. The script fills it in (src/runtime/canvas-dom.js).
   const minimap = `<div class="am-canvas-minimap" data-am="canvas-minimap" role="presentation" hidden><svg data-am="canvas-minimap-svg" aria-hidden="true"></svg></div>`;
-  return `<main class="am-canvas" data-canvas>
+  // The two labels the full-screen button swaps between travel with the page, so the script needs no language file.
+  const labels = esc(JSON.stringify({ fullscreen, exitFullscreen: c.exitFullscreen ?? 'Exit full screen' }));
+  return `<main class="am-canvas" data-canvas data-labels="${labels}">
 ${headHtml(meta, introHtml, language)}
 <div class="am-canvas-viewport">
 ${controls}

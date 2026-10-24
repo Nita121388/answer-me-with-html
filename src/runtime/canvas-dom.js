@@ -538,7 +538,11 @@
   };
   const paintBox = () => {
     const r = boxRect();
-    if (!r) return boxEl.hidden = true;
+    // A press with no movement is not a box: showing a dashed outline for every click would flash on the board.
+    if (!r || (r.right - r.left < 3 && r.bottom - r.top < 3)) {
+      boxEl.hidden = true;
+      return;
+    }
     boxEl.hidden = false;
     boxEl.style.left = `${r.left}px`;
     boxEl.style.top = `${r.top}px`;
@@ -546,12 +550,19 @@
     boxEl.style.height = `${r.bottom - r.top}px`;
   };
   // Every node whose box overlaps the marquee, in viewport coordinates.
+  // The box is drawn in viewport coordinates (that is where its element lives), and the node rectangles are window
+  // coordinates, so the two are brought into the same space before they are compared.
   const withinBox = () => {
     const r = boxRect();
     if (!r) return [];
+    const vp = viewport.getBoundingClientRect();
+    const box = {
+      left: r.left + vp.left, right: r.right + vp.left,
+      top: r.top + vp.top, bottom: r.bottom + vp.top,
+    };
     return nodes.filter((n) => {
       const b = n.getBoundingClientRect();
-      return b.right >= r.left && b.left <= r.right && b.bottom >= r.top && b.top <= r.bottom;
+      return b.right >= box.left && b.left <= box.right && b.bottom >= box.top && b.top <= box.bottom;
     });
   };
 
@@ -561,14 +572,17 @@
     // button would never see it.
     // A press inside a node belongs to the node or to a control in it, never to the board: taking the pointer here would
     // swallow the click that control was waiting for (the node's own handler stops the press, but it lets a control through).
-    if (e.button !== 0 || panning || box) return;
-    // The space is held: this press pans the board, whatever it landed on.
-    if (!space && e.target.closest('.am-canvas-edge, .am-canvas-zoom, .am-canvas-minimap, .am-canvas-node')) return;
-    if (e.shiftKey && !space) {
-      // Shift extends the selection, so the box starts from what is already selected.
+    // A middle-button press pans wherever it lands, like the space does.
+    const wantsPan = space || e.button === 1;
+    if (!wantsPan && (e.button !== 0 || e.target.closest('.am-canvas-edge, .am-canvas-zoom, .am-canvas-minimap, .am-canvas-node'))) return;
+
+    if (!wantsPan) {
+      // A plain drag on the empty board draws a box and selects what it touches; shift adds to the selection instead of
+      // replacing it. Panning is the space bar's job, so an ordinary press never moves the board by accident.
       const r = viewport.getBoundingClientRect();
       box = { from: { x: e.clientX - r.left, y: e.clientY - r.top }, to: { x: e.clientX - r.left, y: e.clientY - r.top }, id: e.pointerId };
-      boxFrom = [...selection];
+      boxFrom = e.shiftKey ? [...selection] : [];
+      if (!e.shiftKey) setSelection([]);
       html.setAttribute('data-am-canvas-drag', '');
       viewport.setPointerCapture?.(e.pointerId);
       paintBox();
@@ -698,8 +712,10 @@
   // on it moves the view, which is the fastest way across a board that is wider than the screen.
   const minimap = document.querySelector('[data-am="canvas-minimap"]');
   const minimapSvg = document.querySelector('[data-am="canvas-minimap-svg"]');
-  const MINIMAP_MAX = 168; // px, the longer side of the picture
-  const MINIMAP_MIN = 56; // px, so a board of one panel is not a dot
+  // The picture is as large as it can be and still leave the board room: at most a third of the shorter side of the viewport,
+  // and never the dot at 56px that a two-panel board would otherwise get.
+  const MINIMAP_MAX = 300;
+  const MINIMAP_MIN = 56;
   let mini = { scale: 1, w: 0, h: 0 }; // px of the picture per px of the board
   const miniRects = new Map(); // node -> its rect in the minimap
   let miniView = null;
@@ -716,7 +732,10 @@
     const boardW = stage.offsetWidth;
     const boardH = stage.offsetHeight;
     if (!boardW || !boardH) return;
-    const scale = Math.min(MINIMAP_MAX / boardW, MINIMAP_MAX / boardH, 1);
+    // At most a third of the shorter side of the viewport, and no larger than MINIMAP_MAX.
+    const room = viewport.getBoundingClientRect();
+    const cap = Math.max(MINIMAP_MIN, Math.min(MINIMAP_MAX, Math.min(room.width, room.height) / 3));
+    const scale = Math.min(cap / boardW, cap / boardH, 1);
     const w = Math.max(MINIMAP_MIN, Math.round(boardW * scale));
     const h = Math.max(MINIMAP_MIN, Math.round(boardH * scale));
     // A board smaller than the picture is centred in it rather than stretched.
@@ -833,6 +852,46 @@
   document.querySelector('[data-am="canvas-fit"]')?.addEventListener('click', fit);
   document.querySelector('[data-am="canvas-reset"]')?.addEventListener('click', reset);
   document.querySelector('[data-am="canvas-drawio"]')?.addEventListener('click', downloadDrawio);
+
+  // ---- full screen ----
+  // The board's own full-screen mode, not the browser's: the toolbar, the minimap and the head stay where they are, and the
+  // viewport takes the whole window. The API needs a user gesture, which a click on the button is, and it may be blocked (a
+  // sandboxed frame, an iframe without the permission): the page then falls back to a class that does the same in CSS, so the
+  // button always does what it says.
+  const fsBtn = document.querySelector('[data-am="canvas-fullscreen"]');
+  const setFullscreen = (on) => {
+    document.documentElement.classList.toggle('am-board-full', on);
+    if (fsBtn) {
+      fsBtn.setAttribute('aria-pressed', String(on));
+      fsBtn.textContent = on ? (labels.exitFullscreen ?? 'Exit full screen') : (labels.fullscreen ?? 'Full screen');
+    }
+    placeMinimap();
+    redrawEdges();
+  };
+  const labels = (() => {
+    try {
+      return JSON.parse(document.querySelector('[data-canvas]')?.dataset.labels ?? '{}');
+    } catch {
+      return {};
+    }
+  })();
+  if (fsBtn) {
+    fsBtn.addEventListener('click', async () => {
+      const on = !document.documentElement.classList.contains('am-board-full');
+      setFullscreen(on);
+      // The real full screen is a bonus: the page's own mode already works without it.
+      try {
+        if (on) await document.documentElement.requestFullscreen?.();
+        else if (document.fullscreenElement) await document.exitFullscreen();
+      } catch {
+        // Without the permission the class above is what the reader sees.
+      }
+    });
+  }
+  // Escape leaves the board's full-screen mode (the browser's own full screen already leaves on Escape).
+  addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && document.documentElement.classList.contains('am-board-full')) setFullscreen(false);
+  });
 
   // A plain click on the empty board clears the selection; Escape does the same and also drops a selected edge. The click that
   // ends a marquee or a pan must not clear what the gesture just selected, so a gesture that moved leaves a flag behind.

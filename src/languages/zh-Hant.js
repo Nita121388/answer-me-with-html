@@ -21,7 +21,7 @@ export default {
     mode: { auto: '跟隨系統', light: '淺色', dark: '深色' },
     scale: { down: '縮小文字', up: '放大文字' },
     move: '移動面板', resetOrder: '恢復原始順序',
-    canvas: { zoomIn: '放大', zoomOut: '縮小', fit: '適應', reset: '重設', linkFrom: '從這裡連出去', copyEdges: '複製連線', drawio: '匯出 drawio' },
+    canvas: { zoomIn: '放大', zoomOut: '縮小', fit: '適應', reset: '重設', linkFrom: '從這裡連出去', copyEdges: '複製連線', drawio: '匯出 drawio' , fullscreen: '全螢幕', exitFullscreen: '退出全螢幕'},
     copy: '複製源稿', done: '已複製 ✓', copyCode: '複製',
     update: { button: '新版本 {version}', current: '目前 {current}。產生此頁時偵測到新版本。', whatsNew: '這次更新：', run: '在終端機執行：', agent: '或者告訴 Agent：', agentText: '更新 answer-me-with-html', notes: '查看更新內容' },
     live: { updated: '頁面已更新', reload: '重新整理' },

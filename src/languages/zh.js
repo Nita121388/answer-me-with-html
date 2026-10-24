@@ -16,7 +16,7 @@ export default {
     mode: { auto: '跟随系统', light: '亮', dark: '暗' },
     scale: { down: '缩小文字', up: '放大文字' },
     move: '移动面板', resetOrder: '恢复原始顺序',
-    canvas: { zoomIn: '放大', zoomOut: '缩小', fit: '适配', reset: '复位', linkFrom: '从这里连出去', copyEdges: '复制连线', drawio: '导出 drawio' },
+    canvas: { zoomIn: '放大', zoomOut: '缩小', fit: '适配', reset: '复位', linkFrom: '从这里连出去', copyEdges: '复制连线', drawio: '导出 drawio' , fullscreen: '全屏', exitFullscreen: '退出全屏'},
     copy: '复制源稿', done: '已复制 ✓', copyCode: '复制',
     update: { button: '新版本 {version}', current: '当前 {current}。生成此页时检测到新版本。', whatsNew: '这次更新：', run: '在终端运行：', agent: '或者告诉 Agent：', agentText: '更新 answer-me-with-html', notes: '查看更新内容' },
     live: { updated: '页面已更新', reload: '刷新' },
