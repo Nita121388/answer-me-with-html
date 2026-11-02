@@ -8,6 +8,7 @@ export default {
       button: 'Remark', need: 'Pick a tag to save',
       hint: 'Optional note', save: 'Save', remove: 'Remove', clear: 'Clear all remarks', clearConfirm: 'Click again to clear {n}',
       section: 'Remarks',
+      words: 'quote',
       kinds: { suggestion: 'suggestion', keep: 'keep', question: 'question', concern: 'concern' },
     },
     theme: 'Theme', modeLabel: 'Mode',

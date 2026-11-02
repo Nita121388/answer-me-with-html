@@ -28,7 +28,9 @@ export function replyText({ title, decisions, comments, remarks = [], ui, rtl = 
   if (remarks.length) {
     out.push('', `## ${ui.remarks}`);
     for (const r of remarks) {
-      const label = [r.panel, ui.kinds?.[r.kind] ?? r.kind].filter(Boolean).join(' · ');
+      // A mark on a block names its tag; a mark on words has no tag unless the reader picked one, so it is a quote.
+      const kind = r.kind ? (ui.kinds?.[r.kind] ?? r.kind) : r.words ? ui.words : '';
+      const label = [r.panel, kind].filter(Boolean).join(' · ');
       out.push(`- **${label}** "${r.quote}"`, ...quoted(r.note));
     }
   }

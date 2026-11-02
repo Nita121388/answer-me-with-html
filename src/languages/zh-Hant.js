@@ -15,6 +15,7 @@ export default {
       button: '標註', need: '選擇標籤後才能儲存',
       hint: '批註（可選）', save: '儲存', remove: '刪除', clear: '清除所有標註', clearConfirm: '再次點擊以清除 {n} 處標註',
       section: '標註',
+      words: '引用',
       kinds: { suggestion: '建議', keep: '保留', question: '疑問', concern: '關注' },
     },
     theme: '主題', modeLabel: '明暗',

@@ -14,6 +14,7 @@ export default {
       button: 'סימון', need: 'בחרו תגית כדי לשמור',
       hint: 'הערה (אופציונלי)', save: 'שמירה', remove: 'הסרה', clear: 'ניקוי כל הסימונים', clearConfirm: 'לחצו שוב כדי לנקות {n} סימונים',
       section: 'סימונים',
+      words: 'ציטוט',
       kinds: { suggestion: 'הצעה', keep: 'להשאיר', question: 'שאלה', concern: 'חשש' },
     },
     theme: 'ערכת עיצוב', modeLabel: 'מצב',
