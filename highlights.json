@@ -1,28 +1,18 @@
 {
-  "version": "0.5.7",
+  "version": "0.5.10",
   "en": [
-    "Every draft error is listed at once; a stdin draft is kept for line edits",
-    "A table with no |---| row is an error instead of plain text",
-    "Long flow edges are no longer cut off at the edge of the diagram"
+    "Write a component as a :::callout … ::: block too; it renders like ```"
   ],
   "zh": [
-    "草稿错误一次列全；stdin 草稿会保存下来，只改出错的行",
-    "表格缺少 |---| 分隔行时报错，不再输出成一行行竖线",
-    "flow 图里绕到外侧的长连线不再被裁掉"
+    "组件也可以写成 :::callout … ::: 块，渲染结果和 ``` 写法相同"
   ],
   "zh-Hant": [
-    "草稿錯誤一次列全；stdin 草稿會保存下來，只改出錯的行",
-    "表格缺少 |---| 分隔行時報錯，不再輸出成一行行豎線",
-    "flow 圖裡繞到外側的長連線不再被裁掉"
+    "元件也可以寫成 :::callout … ::: 區塊，渲染結果和 ``` 寫法相同"
   ],
   "ja": [
-    "下書きのエラーを一度にすべて表示し、stdin の下書きを保存して該当行だけ直せます",
-    "表に |---| の区切り行がないとエラーになり、テキストのまま出力されません",
-    "flow 図で外側を回る長い線が切れなくなりました"
+    "コンポーネントは :::callout … ::: でも書け、``` と同じ表示になります"
   ],
   "he": [
-    "כל שגיאות הטיוטה מוצגות בבת אחת; טיוטה מ-stdin נשמרת לתיקון שורות",
-    "טבלה בלי שורת |---| היא שגיאה, ולא טקסט רגיל",
-    "קווים ארוכים בתרשים flow כבר לא נחתכים בשולי התרשים"
+    "אפשר לכתוב רכיב גם כבלוק :::callout … :::, והוא מוצג כמו ```"
   ]
 }

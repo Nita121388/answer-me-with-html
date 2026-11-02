@@ -2,6 +2,10 @@
 // Structure splitting only, no rendering. All line numbers are 1-based source-file lines, for error messages and the STE lint.
 
 import { themeNames, AUTO } from './themes/registry.js';
+import { COMPONENTS } from './components/index.js';
+import { parseAttrs, coerce, unquote } from './attrs.js';
+
+export { parseAttrs };
 
 export class ParseError extends Error {
   constructor(message, line, example) {
@@ -33,6 +37,7 @@ export const CHOICES = Object.freeze({
   theme: [AUTO, ...themeNames('page')],
   style: ['off', '80', 'strict'],
   mode: ['auto', 'light', 'dark'],
+  outline: ['left', 'right'],
 });
 
 // Command-line arguments override draft and config settings: validates values, returns a new meta without changing the original. Keys with undefined values are ignored.
@@ -56,24 +61,24 @@ const DEFAULT_META = Object.freeze({
   theme: AUTO,
   style: '80',
   mode: 'auto',
+  outline: 'right',
   cols: 3,
   title: '',
 });
 
-const NUMERIC_KEYS = new Set(['cols', 'span']);
-// Panel attributes. collapse makes a panel a fold; collapsed starts it folded. They are booleans when written bare,
-// so `{collapse}` and `{collapse=true}` are the same thing.
-const FOLD_ATTRS = new Set(['collapse', 'collapsed']);
-// Page-level booleans: `drag: true` makes the panels movable on the page (src/runtime/drag.js).
-const BOOL_KEYS = new Set([...FOLD_ATTRS, 'drag']);
 const FENCE_OPEN = /^(`{3,}|~{3,})\s*([^\s`]*)\s*(.*)$/;
+// `:::name args` is the admonition syntax of VitePress and Docusaurus; with a component name it is an alias of the fenced block.
+const COLON_OPEN = /^ {0,3}(:{3,})\s*([A-Za-z][\w-]*)(?:\s+(.*?))?\s*$/;
+const COLON_CLOSE = /^ {0,3}(:{3,})\s*$/;
+// A fence indented by one to three spaces is still code in Markdown, though only a fence at column 0 opens a block here; a `:::`
+// line inside one stays text.
+const INDENTED_FENCE = /^ {1,3}(`{3,}|~{3,})/;
 const PANEL_HEADING = /^##\s+(.+?)\s*$/;
 const ATTR_BLOCK = /\s*\{([^{}]*)\}\s*$/;
 // A leading capital is an ID only when the title after it does not start with a lowercase letter: "## A miss goes…" and
 // "## I think…" are sentences, not ID + title (#208). The lookahead also rejects a space, so \s+ cannot backtrack past it.
 // The ID is one capital and up to two digits: A to Z for the first 26 panels, then P27, P28 … for the ones after (#292).
 const PANEL_ID = /^([A-Z][0-9]{0,2})\s+(?![\s\p{Ll}])(.+)$/u;
-const ATTR_TOKEN = /([\w-]+)(?:=("[^"]*"|'[^']*'|\S+))?/g;
 
 // defaults: default values from the user config (e.g. theme / mode / style); values set explicitly in the draft frontmatter win.
 // choices can widen the allowed values of individual keys (video drafts also allow theme: 3b1b).
@@ -137,8 +142,25 @@ function splitSections(lines, start, errors) {
     mdBuf = null;
   };
 
+  let indented = null;
   for (let i = start; i < lines.length; i++) {
     const line = lines[i];
+    const mark = line.match(INDENTED_FENCE)?.[1];
+    if (indented) {
+      if (mark && mark[0] === indented[0] && mark.length >= indented.length && !line.trim().slice(mark.length)) indented = null;
+    } else if (mark) {
+      indented = mark;
+    }
+    const colon = indented ? null : line.match(COLON_OPEN);
+    const colonName = colon?.[2].toLowerCase();
+    if (colon && COMPONENTS.has(colonName)) {
+      flushMd();
+      const close = lines.findIndex((l, k) => k > i && l.match(COLON_CLOSE)?.[1].length >= colon[1].length);
+      if (close === -1) throw new ParseError(`fenced block ${colon[1]}${colon[2]} is not closed`, i + 1);
+      current.blocks.push({ type: 'fence', lang: colonName, args: (colon[3] ?? '').trim(), text: lines.slice(i + 1, close).join('\n'), line: i + 1 });
+      i = close;
+      continue;
+    }
     const fence = line.match(FENCE_OPEN);
     if (fence) {
       flushMd();
@@ -257,14 +279,6 @@ function parseHeading(text) {
     : { id: null, title: rest.trim(), attrs };
 }
 
-export function parseAttrs(text) {
-  const attrs = {};
-  for (const m of text.matchAll(ATTR_TOKEN)) {
-    attrs[m[1]] = m[2] === undefined ? true : coerce(m[1], unquote(m[2]));
-  }
-  return attrs;
-}
-
 function extractTitle(intro, meta) {
   if (meta.title || intro[0]?.type !== 'md') return intro;
   const [first, ...rest] = intro;
@@ -309,11 +323,6 @@ function assignIds(panels) {
   return panels.map((p) => (p.id ? p : { ...p, id: nextFree() }));
 }
 
-function unquote(v) {
-  const s = v.trim();
-  return /^(["']).*\1$/.test(s) ? s.slice(1, -1) : s;
-}
-
 // Strip an unquoted trailing # comment; a # inside quotes is kept (title: "Issue #123").
 function stripLineComment(line) {
   let quote = '';
@@ -343,14 +352,4 @@ function fractionalCount(key, value, line, keys) {
   if (!keys.has(key) || typeof value !== 'string' || !value.trim()) return null;
   const n = Number(value);
   return Number.isFinite(n) && !Number.isInteger(n) ? new ParseError(`${key} must be a whole number, not "${value}"`, line) : null;
-}
-
-// A bare attribute is `true`. For a fold attribute, "false" / "off" / "0" / "no" turn it off, so a page can fold every panel
-// in the frontmatter and still keep one panel open with {collapse=false}.
-const OFF = new Set(['false', 'off', '0', 'no']);
-
-function coerce(key, value) {
-  if (NUMERIC_KEYS.has(key) && /^\d+$/.test(value)) return Number(value);
-  if (BOOL_KEYS.has(key)) return value === true || !OFF.has(String(value).trim().toLowerCase());
-  return value;
 }

@@ -7,10 +7,46 @@
   const ui = JSON.parse(btn.dataset.ui);
   const KINDS = ['suggestion', 'keep', 'question', 'concern'];
   const storeKey = `am-remark:${location.pathname}`;
+  // A page served by `am serve` has no localStorage and the phone may discard its tab; it keeps the marks on the server, in the
+  // same record as the answers (reply.js), so a re-opened page finds them again.
+  const serve = (() => {
+    const { amSave: save, amState: state } = document.body?.dataset ?? {};
+    if (!save) return null;
+    try {
+      return { save, restored: state ? JSON.parse(state) : null };
+    } catch {
+      return { save, restored: null };
+    }
+  })();
+  let saveTimer = null;
+  let pendingPatch = null;
+  const sendSave = (patch) => {
+    fetch(serve.save, { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(patch), keepalive: true })
+      .catch(() => {});
+  };
+  const saveSoon = (patch) => {
+    clearTimeout(saveTimer);
+    pendingPatch = patch;
+    saveTimer = setTimeout(() => {
+      pendingPatch = null;
+      sendSave(patch);
+    }, 400);
+  };
+  // A hidden or closing page sends the change it still holds, before the timer can run.
+  const flushSave = () => {
+    if (!pendingPatch) return;
+    clearTimeout(saveTimer);
+    sendSave(pendingPatch);
+    pendingPatch = null;
+  };
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') flushSave();
+  });
+  window.addEventListener('pagehide', flushSave);
   // The one definition of a block a reader can mark: the content under <main>. The page and panel titles are left out, because the
   // reply reads them as text; a panel has its Comment button.
   // A $$ block on its own is a div; a $$ formula inside a sentence is a span of its paragraph.
-  const BLOCK = 'main :is(h1,h2,h3,h4,h5,h6,p,li,blockquote,pre,table,dd,dt,figure,div.am-math-block):not(.am-head *, .am-panel-head *)';
+  const BLOCK = 'main :is(h1,h2,h3,h4,h5,h6,p,li,blockquote,pre,table,dd,dt,figure,div.am-math-block):not(.am-head *, .am-panel-head *, .am-toc *)';
   // A click on these does what it always did.
   const LIVE = '.am-remark-pop, .am-toolbar, a, button, input, textarea, select, label';
   const blockAt = (target) => (target.closest(LIVE) ? null : target.closest(BLOCK));
@@ -55,6 +91,8 @@
   };
 
   const load = () => {
+    const restored = serve?.restored?.remark;
+    if (Array.isArray(restored)) return restored.filter((m) => typeof m?.key === 'string' && KINDS.includes(m.kind));
     try {
       const saved = JSON.parse(localStorage.getItem(storeKey));
       return Array.isArray(saved) ? saved.filter((m) => typeof m?.key === 'string' && KINDS.includes(m.kind)) : [];
@@ -64,11 +102,15 @@
   };
   // A mark whose block is gone from the page stays stored (it may return with `am patch`); it is neither painted nor sent.
   const marks = new Map(load().map((m) => [m.key, { key: m.key, kind: m.kind, note: String(m.note ?? '') }]));
+  // Kind and note of a popover closed without Save, by block key, until the page reloads (see open below).
+  const drafts = new Map();
   const clearBtn = document.createElement('button');
   clearBtn.type = 'button';
   clearBtn.className = 'am-btn am-btn--remark-clear';
-  clearBtn.hidden = true;
   clearBtn.textContent = ui.clear;
+  // Clear all drops saved marks and drafts, so it shows while either exists.
+  const toClear = () => marks.size + drafts.size;
+  const showClear = () => { clearBtn.hidden = toClear() === 0; };
   btn.insertAdjacentElement('afterend', clearBtn);
   let clearTimer = null;
   let clearArmed = false;
@@ -78,12 +120,12 @@
     clearArmed = false;
     clearBtn.classList.remove('is-armed');
     clearBtn.textContent = ui.clear;
-    clearBtn.hidden = marks.size === 0;
+    showClear();
   };
   const armClear = () => {
     clearArmed = true;
     clearBtn.classList.add('is-armed');
-    clearBtn.textContent = ui.clearConfirm.replace('{n}', marks.size);
+    clearBtn.textContent = ui.clearConfirm.replace('{n}', toClear());
     clearTimer = setTimeout(resetClear, 4000);
   };
   clearBtn.addEventListener('click', () => {
@@ -93,11 +135,14 @@
     }
     for (const el of document.querySelectorAll('.am-mark')) unpaint(el);
     marks.clear();
+    // A draft is a remark the reader has not saved yet; Clear all drops it too, so no block reopens with an old kind.
+    drafts.clear();
     try {
       localStorage.removeItem(storeKey);
     } catch {
       // Storage may be off (private window, a sandboxed page); the in-memory marks still clear.
     }
+    if (serve) saveSoon({ remark: [] });
     resetClear();
     document.dispatchEvent(new Event('am-remark-change'));
   });
@@ -107,9 +152,10 @@
     } catch {
       // Storage may be off (private window, a sandboxed page); marks then last until the page closes.
     }
+    if (serve) saveSoon({ remark: [...marks.values()] });
     // The reply bar (reply.js) shows the number of marks.
     document.dispatchEvent(new Event('am-remark-change'));
-    clearBtn.hidden = marks.size === 0;
+    showClear();
   };
 
   const chip = (el, mark) => {
@@ -137,10 +183,11 @@
     el.classList.remove('am-mark');
     delete el.dataset.kind;
   };
-  clearBtn.hidden = marks.size === 0;
+  showClear();
   if (marks.size) for (const [el, key] of keyMap()) if (marks.has(key)) paint(el, marks.get(key));
 
-  // The popover edits one block. Save stays off until a kind is picked.
+  // The popover edits one block. Save stays off until a kind is picked, and a hint says so. 1–4 pick a kind from the keyboard and
+  // move to the note; Ctrl / Cmd + Enter saves. A popover closed without Save keeps its kind and note as a draft for that block until the page reloads.
   const pop = document.createElement('div');
   pop.className = 'am-remark-pop';
   pop.hidden = true;
@@ -149,8 +196,11 @@
   document.body.append(pop);
   let opener = null;
   let anchor = null;
+  let keepDraft = null;
   const close = (restoreFocus) => {
     if (pop.hidden) return;
+    keepDraft?.();
+    keepDraft = null;
     pop.hidden = true;
     if (restoreFocus) (opener?.isConnected && opener !== document.body ? opener : btn).focus();
   };
@@ -167,14 +217,23 @@
   const open = (el) => {
     const key = keyMap().get(el);
     const mark = marks.get(key);
-    let kind = mark?.kind ?? '';
+    const draft = drafts.get(key);
+    let kind = draft?.kind ?? mark?.kind ?? '';
     opener = document.activeElement;
     anchor = el;
 
-    const note = make('textarea', { rows: 2, placeholder: ui.hint, value: mark?.note ?? '' });
+    const note = make('textarea', { rows: 2, placeholder: ui.hint, value: draft?.note ?? mark?.note ?? '' });
     note.setAttribute('aria-label', ui.hint);
     const keep = make('button', { type: 'button', className: 'am-btn', textContent: ui.save, disabled: !kind });
+    const need = make('span', { className: 'am-remark-need', textContent: ui.need, hidden: Boolean(kind) });
+    keepDraft = () => {
+      if (kind || note.value.trim()) drafts.set(key, { kind, note: note.value });
+      else drafts.delete(key);
+      showClear();
+    };
+    const done = () => { drafts.delete(key); keepDraft = null; showClear(); };
     keep.addEventListener('click', () => {
+      done();
       const saved = { key, kind, note: note.value.trim() };
       marks.set(key, saved);
       save();
@@ -186,6 +245,7 @@
     if (mark) {
       const drop = make('button', { type: 'button', className: 'am-btn', textContent: ui.remove });
       drop.addEventListener('click', () => {
+        done();
         marks.delete(key);
         save();
         unpaint(el);
@@ -193,17 +253,34 @@
       });
       actions.append(drop);
     }
-    const kindBtns = KINDS.map((k) => {
+    const choose = (k) => {
+      kind = k;
+      for (const other of kindBtns) other.setAttribute('aria-pressed', String(other.dataset.kind === k));
+      keep.disabled = false;
+      need.hidden = true;
+    };
+    const kindBtns = KINDS.map((k, i) => {
       const kb = make('button', { type: 'button', className: 'am-remark-kind', textContent: ui.kinds[k] });
       kb.dataset.kind = k;
+      kb.dataset.n = i + 1;
       kb.setAttribute('aria-pressed', String(k === kind));
-      kb.addEventListener('click', () => {
-        kind = k;
-        for (const other of kindBtns) other.setAttribute('aria-pressed', String(other === kb));
-        keep.disabled = false;
-      });
+      kb.addEventListener('click', () => choose(k));
       return kb;
     });
+    // Ctrl / Cmd + Enter presses Save (nothing while Save waits for a kind). A digit types into the note, so it picks a kind
+    // only while the focus is outside the note.
+    pop.onkeydown = (e) => {
+      if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && !e.isComposing) {
+        e.preventDefault();
+        if (!keep.disabled) keep.click();
+        return;
+      }
+      if (e.target === note || e.ctrlKey || e.metaKey || e.altKey || !/^[1-4]$/.test(e.key)) return;
+      e.preventDefault();
+      choose(KINDS[Number(e.key) - 1]);
+      note.focus();
+    };
+    actions.append(need);
     pop.replaceChildren(make('div', { className: 'am-remark-kinds' }), note, actions);
     pop.firstChild.append(...kindBtns);
     pop.hidden = false;
@@ -225,6 +302,25 @@
     const el = blockAt(e.target);
     if (el) open(el);
   };
+  // The keyboard picks too: while the mode is on, every block takes focus with Tab, and Enter or Space opens its popover. A block
+  // that already had a tabindex keeps it; only the ones the mode added lose it again.
+  const pickKey = (e) => {
+    if ((e.key !== 'Enter' && e.key !== ' ') || e.ctrlKey || e.metaKey || e.altKey || !e.target.hasAttribute?.('data-am-pick')) return;
+    e.preventDefault();
+    open(e.target);
+  };
+  const focusable = (on) => {
+    if (!on && !keys) return; // the mode starts off: a page nobody marked builds no block keys
+    for (const el of keyMap().keys()) {
+      if (on && !el.hasAttribute('tabindex')) {
+        el.tabIndex = 0;
+        el.setAttribute('data-am-pick', '');
+      } else if (!on && el.hasAttribute('data-am-pick')) {
+        el.removeAttribute('tabindex');
+        el.removeAttribute('data-am-pick');
+      }
+    }
+  };
   const setMode = (on) => {
     btn.classList.toggle('is-on', on);
     btn.setAttribute('aria-pressed', String(on));
@@ -232,6 +328,8 @@
     document.body[toggle]('click', pick);
     document.body[toggle]('mouseover', track);
     document.body[toggle]('mouseout', track);
+    document.body[toggle]('keydown', pickKey);
+    focusable(on);
     if (!on) {
       track({ type: 'mouseout', relatedTarget: null });
       close(false);

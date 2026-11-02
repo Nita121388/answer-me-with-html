@@ -27,7 +27,7 @@ Server -> Client: SYN-ACK
 > 先是客户端开口，发一个 SYN，意思是"我想跟你建个连接"。
 > [Server] 听到了，回一个 SYN-ACK："收到，我这边也没问题。"`;
 
-const ALWAYS_RULE = '帮我打开 Answer me with HTML 的高频模式：在你的全局规则文件里加一条规则——"[answer-me-with-html always-on] 只要回复里给出了结论、总结、方案、对比、评审或讲解，就同时用 answer-me-with-html skill 生成一页 HTML（日常结论用 2～4 个面板），先渲染页面，再写文字回复，回复最后附上页面的 file:// 链接，不要先写文字再渲染。哪怕回答很短也要出，不要因为答案不长就跳过。渲染时加 --no-open，不要弹出浏览器。闲聊、没有结论的一两句话、纯命令输出、我要求纯文本时除外。"';
+const ALWAYS_RULE = '帮我打开 Answer me with HTML 的高频模式：在你的全局规则文件里加一条规则——"[answer-me-with-html always-on] 只要回复里给出了结论、总结、方案、对比、评审或讲解，就同时用 answer-me-with-html skill 生成一页 HTML（日常结论用 2～4 个面板），先渲染页面，再写文字回复，回复最后按 SKILL.md 对当前宿主的要求附上页面链接，不要先写文字再渲染。哪怕回答很短也要出，不要因为答案不长就跳过。渲染时加 --no-open，不要弹出浏览器。闲聊、没有结论的一两句话、纯命令输出、我要求纯文本时除外。另外，子 Agent 向父 Agent 汇报属于内部材料，不是给用户的回复：按父 Agent 的要求返回完整结论与证据，除了任务明确要求出页面，否则不要生成页面。"';
 
 // 脚本运行时读取的文字（{n}、{ms} 等由脚本填入）。
 const ui = {
@@ -175,6 +175,15 @@ export default {
   nav_benchmark: '基准测试',
   nav_install: '安装',
   nav_catalog: '主题库',
+  nav_changelog: '更新日志',
+  cl_meta_title: '更新日志 — Answer me with HTML',
+  cl_meta_desc: 'Answer me with HTML 每个版本的更新内容，新版本在前。内容和 GitHub Release 的说明相同，有中英两种语言。',
+  cl_title: '更新日志',
+  cl_lede: '每个版本改了什么，新版本在前。这些是 <a href="https://github.com/QingYunA/answer-me-with-html/releases">GitHub Release</a> 的说明。',
+  cl_toc: '本页版本',
+  cl_release: 'GitHub Release',
+  cl_anchor: '链接到版本',
+  cl_en_only: '这个版本的说明没有中文版，这里显示英文原文。',
   alt_hreflang: 'en',
   alt_code: 'en',
   alt_label: 'EN',
@@ -413,7 +422,7 @@ export default {
   th_meta_title: '主题库 — Answer me with HTML',
   th_meta_desc: 'Answer me with HTML 的页面主题库。点开一个主题，可看浅色和深色的效果；复制一条命令，或让 agent 代为安装。',
   th_title: '主题库',
-  th_lede: '每个主题就是一个 JSON 文件。点开一张卡片，可以在示例页面上看这个主题的浅色和深色效果，并安装它。鼠标悬停或键盘聚焦在卡片上，可以先看一眼深色。没用到某个主题的页面，不会带上它。',
+  th_lede: '每个主题就是一个 JSON 文件。点开一张卡片，可以在示例页面上看这个主题的浅色和深色效果，并安装它。鼠标悬停或键盘聚焦在卡片上，可以先看一眼深色。装好之后，每个新页面的主题选择器里都会出现它。',
   th_submit_k: '参与',
   th_submit_t: '提交你自己的主题',
   th_submit_d: '也可以在<a href="new/" id="submit-theme">主题编辑器</a>里手动制作，或者提交 PR，新增 <code>marketplace/themes/&lt;name&gt;.json</code>，规则见 <a href="https://github.com/QingYunA/answer-me-with-html/blob/main/CONTRIBUTING.md#theme-catalog">CONTRIBUTING.md</a>。每个主题上墙前都由维护者审核。主题库里的名字永久保留。',
@@ -467,6 +476,8 @@ export default {
   f_why: 'Karpathy 发过<a href="https://x.com/karpathy/status/2105819303471976479">一条推文</a>，大意是 LLM 干的活越来越多，人反而越来越难跟上它的输出；比起一大段文字，一张图、一页网页要好读得多。直接让 Agent 写 HTML 也行，就是慢：大半时间花在每次都差不多的 CSS 上，流程图的坐标还得模型自己猜。所以这个项目把这些活从模型手里拿走了：模型只写内容，排版、配色、画图都交给 CLI。',
   f_source: '源码',
   f_community: '社区',
+  f_support: '支持',
+  f_afdian: '爱发电',
   f_drawn: '本站',
   f_drawn_v: '用它自己的 blueprint 主题画成。没有框架，不下载字体。只用 Umami 做匿名的访问和点击统计，不用 cookie。',
 

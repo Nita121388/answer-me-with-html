@@ -17,6 +17,8 @@
   <a href="https://github.com/QingYunA/answer-me-with-html/stargazers"><img src="https://img.shields.io/github/stars/QingYunA/answer-me-with-html?style=flat-square&logo=github&labelColor=16181d&color=2ea44f" alt="Stars"></a>
   <img src="https://img.shields.io/badge/works%20with-Claude%20Code%20%C2%B7%20Codex%20%C2%B7%20Cursor%20%C2%B7%20OpenCode%20%C2%B7%20Pi%20%C2%B7%20DeepSeek%20Harness-2ea44f?style=flat-square&labelColor=16181d" alt="Works with Claude Code, Codex, Cursor, OpenCode, Pi, DeepSeek Harness">
   <a href="https://www.theagenticleaderboard.com/alternatives/answer-me-with-html/"><img src="https://www.theagenticleaderboard.com/badges/new/answer-me-with-html.svg" alt="The New 100"></a>
+  <a href="https://ko-fi.com/yunqing_love"><img src="https://img.shields.io/badge/Ko--fi-support-ff5e5b?style=flat-square&logo=kofi&logoColor=white&labelColor=16181d" alt="Support on Ko-fi"></a>
+  <a href="https://afdian.com/a/cyan_yunchen"><img src="https://img.shields.io/badge/%E7%88%B1%E5%8F%91%E7%94%B5-support-946ce6?style=flat-square&labelColor=16181d" alt="Support on Afdian"></a>
 </p>
 
 <p align="center">
@@ -180,7 +182,7 @@ Server -> Client: SYN-ACK
 
 默认是关的。建议打开：不用每次开口要页面，短结论也和长篇一样好读。页面会堆在 `~/.answer-me-with-html/` 里，用 `am clean` 清理。想打开，把下面这段话粘贴给你的 Agent，让它写进自己的规则文件（比如 `~/.claude/CLAUDE.md` 或 `AGENTS.md`）：
 
-> 帮我打开 Answer me with HTML 的高频模式：在你的全局规则文件里加一条规则——"[answer-me-with-html always-on] 只要回复里给出了结论、总结、方案、对比、评审或讲解，就同时用 answer-me-with-html skill 生成一页 HTML（日常结论用 2～4 个面板），先渲染页面，再写文字回复，回复最后按 SKILL.md 对当前宿主的要求附上页面链接，不要先写文字再渲染。哪怕回答很短也要出，不要因为答案不长就跳过。渲染时加 --no-open，不要弹出浏览器。闲聊、没有结论的一两句话、纯命令输出、我要求纯文本时除外。"
+> 帮我打开 Answer me with HTML 的高频模式：在你的全局规则文件里加一条规则——"[answer-me-with-html always-on] 只要回复里给出了结论、总结、方案、对比、评审或讲解，就同时用 answer-me-with-html skill 生成一页 HTML（日常结论用 2～4 个面板），先渲染页面，再写文字回复，回复最后按 SKILL.md 对当前宿主的要求附上页面链接，不要先写文字再渲染。哪怕回答很短也要出，不要因为答案不长就跳过。渲染时加 --no-open，不要弹出浏览器。闲聊、没有结论的一两句话、纯命令输出、我要求纯文本时除外。另外，子 Agent 向父 Agent 汇报属于内部材料，不是给用户的回复：按父 Agent 的要求返回完整结论与证据，除了任务明确要求出页面，否则不要生成页面。"
 
 想关掉，把这条规则删掉即可。想让页面少一点？见[少一点主动](docs/reference.zh-CN.md#少一点主动)。
 

@@ -56,7 +56,7 @@ test('permissions: a data directory the session cannot write to falls back to a 
   assert.equal(code, 0, err);
   const page = out.match(/✓ (.+\.html)/)[1];
   assert.equal(dirname(page), join(fallback(), 'pages'));
-  assert.match(basename(page), /^Locked-\d{8}-\d{6}\.html$/);
+  assert.match(basename(page), /^locked-\d{8}-\d{6}\.html$/);
   assert.ok(existsSync(page));
   assert.match(out, new RegExp(`^  ! ${home.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')} is not writable \\(E[A-Z]+\\): saved in the temporary folder, which the system may clear$`, 'm'));
   assert.equal(statSync(fallback()).mode & 0o777, 0o700);
@@ -75,8 +75,8 @@ test('permissions: the data directory and the temporary folder both unwritable g
   chmodSync(sysTmp, 0o500);
   const { code, err } = await run(['render', '-']);
   assert.equal(code, 1, err);
-  assert.match(err, /^✗ Cannot write the page: permission denied \(E[A-Z]+\) .+Locked-\d{8}-\d{6}\.html/m);
-  assert.match(err, /-o "<workspace>\/\.tmp\/answers\/Locked-\d{8}-\d{6}\.html"/);
+  assert.match(err, /^✗ Cannot write the page: permission denied \(E[A-Z]+\) .+locked-\d{8}-\d{6}\.html/m);
+  assert.match(err, /-o "<workspace>\/\.tmp\/answers\/locked-\d{8}-\d{6}\.html"/);
   assert.equal(err.trim().split('\n').length, 1, err);
   assert.ok(!/Internal error/.test(err));
   assert.ok(!existsSync(join(home, 'pages')));
@@ -206,7 +206,8 @@ test('permissions: am patch never falls back; a page it may not overwrite gives 
   chmodSync(page, 0o600);
   assert.equal(code, 1, err);
   assert.match(err, /^✗ Cannot write the page: permission denied \(E[A-Z]+\) .+page\.html\. Copy the page to a folder this session can write to and patch the copy$/m);
-  assert.ok(!err.includes('-o'), err);
+  // No -o suggestion. Match the flag as a word: the random temp folder name in the path can contain "-o".
+  assert.doesNotMatch(err, /(^|\s)-o\s/, err);
   assert.ok(!existsSync(fallback()));
   assert.ok(!readFileSync(page, 'utf8').includes('New text'));
 });

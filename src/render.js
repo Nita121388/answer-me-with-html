@@ -339,7 +339,7 @@ ${cspMeta([script], { live: true, blob: meta.template === 'canvas' })}
 <meta name="generator" content="Answer me with HTML ${VERSION}">
 <title>${esc(meta.title || 'Answer me with HTML')}</title>
 <style>
-${pageCss(embedded, { diff: body.includes('class="am-codeblock am-codeblock--diff"'), delta: hasDelta(body), rtl: language.dir === 'rtl', math: hasMath(body), chart: hasChart(body), canvas: meta.template === 'canvas', update: Boolean(update), closeAfter, theme: meta.theme, scale })}
+${pageCss(embedded, { diff: body.includes('class="am-codeblock am-codeblock--diff"'), delta: hasDelta(body), rtl: language.dir === 'rtl', math: hasMath(body), chart: hasChart(body), canvas: meta.template === 'canvas', update: Boolean(update), closeAfter, scale })}
 </style>
 </head>
 <body>

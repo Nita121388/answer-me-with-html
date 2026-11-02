@@ -1,4 +1,4 @@
-// am CLI: render / patch / video / lint / theme / list / help. main() takes injected streams and environment variables, for testing.
+// am CLI: render / patch / video / export / lint / theme / list / help. main() takes injected streams and environment variables, for testing.
 
 import { parseArgs } from 'node:util';
 import { readFileSync, writeFileSync, mkdirSync, existsSync, rmSync, statSync } from 'node:fs';
@@ -19,6 +19,7 @@ import { THEME_SELECTORS } from './themes/selectors.js';
 import { renderVideo } from './video/render.js';
 import { pickProvider, TtsError } from './video/tts.js';
 import { exportMp4, exportWebm, ExportError } from './video/export.js';
+import { exportPage, isHtmlPage } from './export.js';
 import { afterRender, clean, usage, mb, CLEAN } from './housekeeping.js';
 import { runUpdateCheck, pageUpdate } from './update.js';
 import { amHome, readConfig, setConfig, resetConfig, configChoices, CONFIG_KEYS, ConfigError } from './config.js';
@@ -45,6 +46,8 @@ Usage:
   am video  <file|->  [-o <file>] [--voice auto|elevenlabs|local|system|off] [--mp4] [--webm] [--no-open]
                       [--theme ${['auto', ...themeNames('video')].join('|')}] [--mode light|dark]
                                                   render a video draft into a 3b1b-style explainer video player page (--mp4 / --webm also save a video file)
+  am export <page.html> [--pdf <file.pdf>] [--png <dir>]
+                        export a rendered page as an A4 PDF and/or as PNG slices for a chat app (needs Chrome)
   am lint   <file|->  [--style off|80|strict]     run only the STE controlled-writing check
   am config [set <key> <value> | get <key> | reset [key]]  show or change settings
   am serve  [--port 8765] [--lan | --tailscale | --public-url <origin>] [--secret-file <path>]  serve pages over http on 127.0.0.1 (--lan: on the local network; --tailscale: on your tailnet only); am render then prints a link:
@@ -53,7 +56,7 @@ Usage:
   am theme add <name> [--use] [--force]           install a theme from the catalog (answer-me-with-html.com/themes/); --use makes it the default
   am theme list [--remote] | update [name] | remove <name>  show, update or delete the themes in your themes folder
   am list                                         list templates, themes and components
-  am help [component|format|code|image|video|patch|theme]  show component syntax / page draft format / code block / image syntax / video draft format / patch / theme usage
+  am help [component|format|code|image|video|patch|theme|export]  show component syntax / page draft format / code block / image syntax / video draft format / patch / theme / export usage
 
 - A file argument of - reads from stdin (good for heredoc: am render - <<'EOF' ... EOF).
 - -o names an output file, for example -o page.html; it does not name a folder.
@@ -238,6 +241,8 @@ export async function main(argv, io = {}) {
         voice: { type: 'string' },
         mp4: { type: 'boolean' },
         webm: { type: 'boolean' },
+        pdf: { type: 'string' },
+        png: { type: 'string' },
         panel: { type: 'string' },
         from: { type: 'string' },
         days: { type: 'string' },
@@ -271,6 +276,7 @@ export async function main(argv, io = {}) {
     case 'render': return withSource(arg, io, fail, (src, baseDir, from) => cmdRender(src, opts, ctx, baseDir, from));
     case 'patch': return cmdPatch(arg, rest[0], opts, ctx);
     case 'video': return withSource(arg, io, fail, (src, _baseDir, from) => cmdVideo(src, opts, ctx, from));
+    case 'export': return cmdExport(arg, opts, ctx);
     case 'lint': return withSource(arg, io, fail, (src) => cmdLint(src, opts, { print, fail }));
     case 'config': return cmdConfig([arg, ...rest].filter((x) => x !== undefined), ctx);
     case 'theme': return cmdTheme(arg, rest[0], opts, ctx);
@@ -447,6 +453,22 @@ function pagePath(arg, { env, io }) {
   return folders.includes(dirname(path)) && basename(path).endsWith('.html') ? path : false;
 }
 
+const EXPORT_HELP = `Export a rendered page as an A4 PDF and/or PNG slices for a chat app
+
+Usage:
+  am export <page.html> --pdf <file.pdf>
+  am export <page.html> --png <dir>
+  am export <page.html> --pdf <file.pdf> --png <dir>
+
+- The page must be an existing .html file, opened as a file:// URL; am export does not change it.
+- --pdf writes an A4 PDF with the page's own print rules (@media print), background colors, no header and no footer.
+- --png writes <dir>/<page-name>-1.png, -2.png ... at 1200 CSS px wide and 2x (2400 px), in slices no taller than 1800 CSS px.
+  A cut falls in a gap between panels; a panel taller than 1800 CSS px is cut at the limit, so its text can span two PNG files.
+  The toolbar, the reply and remark controls and the new-version notice are left out.
+- Give both flags to write both; at least one is required. The folder for --png is created when missing.
+- Needs Chrome / Chromium / Edge, like am video --mp4 / --webm. Set AM_CHROME when it is not in a usual place.
+- A PDF or PNG is a picture: reply, remarks, the theme switch and the Before/After switches do not work in it.`;
+
 const PATCH_HELP = `Replace one panel of a rendered page in place
 
 Usage:
@@ -455,8 +477,8 @@ Usage:
   am patch <html-file> --panel <title> -
 
 - Reads the source draft from the hidden <textarea id="am-source"> in <html-file>.
-- --panel matches a ## section's title, its letter ID, or "ID title".
-- The new draft comes from stdin or from --from / a second file argument: it may include the ## heading or only the panel body.
+- --panel matches a ## section's title, its letter ID, or "ID title". An explicit ID (## B Title) stays the same when the title changes; an automatic ID moves when a panel before it is added or removed.
+- The new draft comes from stdin or from --from / a second file argument: it may include the ## heading or only the panel body. A new ## heading renames the panel.
 - Renders again with the current renderer and overwrites the same HTML path; it writes no new timestamped file.
 - Keeps the page's template, theme, light/dark mode and STE style (recorded on the page's root tag when it was made). Later config changes do not apply to patched pages; to change them add --theme / --mode / --style.
 - If the panel is not found, or the page has no #am-source, the exit code is non-zero and the file is not changed.`;
@@ -465,7 +487,7 @@ const THEME_HELP = `Install a ready-made theme from the catalog at answer-me-wit
 
 am theme add <name> [--use] [--force]
 - Reads the catalog, downloads themes/<name>.json, checks its size, sha256, colors and links, and saves it to ~/.answer-me-with-html/themes/<name>.json.
-  Only catalog names work, not URLs or paths. --use also makes it the default theme (the same as am config set theme <name>).
+  Only catalog names work, not URLs or paths. --use also makes it the default theme (the same as am config set theme <name>); without it, the theme is still in every new page's theme picker.
 - A file of that name that is not the catalog's is never overwritten (it may be your own theme): add --force to replace it.
 - It asks nothing else. The catalog address can be moved with the AM_CATALOG_URL environment variable (an https URL of an index.json; http only for localhost).
 am theme list [--remote]     built-in themes, then your themes with version and source (catalog, catalog edited, local) and files that cannot be used; --remote also reads the catalog and marks updates and themes you do not have
@@ -493,7 +515,7 @@ Pick it like a built-in theme: theme: notes in the draft, --theme notes, or am c
 - tokens: light and dark must each set every color: ${COLOR_TOKENS.join(' ')}.
   common holds values shared by both; --radius --shadow --bw --head-font --font-sans --font-mono are optional.
 - Fonts: name installed fonts only; the default font stack is added as the fallback.
-- font (optional): a font this tool ships, embedded in a page rendered with the theme: ${FONT_NAMES.join(' | ')}. Use it in css, for example & .am-head h1 { font-family: "Bangers", Impact, sans-serif; }.
+- font (optional): a font this tool ships, embedded once in every page that carries the theme: ${FONT_NAMES.join(' | ')}. Use it in css, for example & .am-head h1 { font-family: "Bangers", Impact, sans-serif; }.
   An older version ignores the field and shows the fallback font.
 - requires (optional): the oldest version of this tool the theme supports, as x.y.z. A newer requirement makes this tool skip the theme.
 - css (optional): start every selector with &, which stands for the theme's root, so the rules apply only under this theme.
@@ -504,7 +526,7 @@ Pick it like a built-in theme: theme: notes in the draft, --theme notes, or am c
   They restyle what is inside flow, sequence and er diagrams and tree boxes, and each defaults to today's look. The series tokens color the bars, lines and slices of a chart: a fixed palette is the default (a light set and a dark set); a series color below 3:1 against --paper in light or dark gives a warning. Widths and radii are a number or px / em (a bare number is px);
   --node-shadow is none or drop-shadow(...), like drop-shadow(3px 3px 0 #111). Do not write diagram selectors in css. There is no token for fonts: diagram text is measured for the sans font.
 - video (optional): video-only variables (--v-stage, --v-title-font, --v-cap-fg, --v-cap-bg, --v-glow) and & css for am video.
-- A page carries the built-in themes plus its own theme, so it opens anywhere; readers without your fonts see the fallback.
+- A page carries the built-in themes plus every installed user theme, so the toolbar can switch to any of them and the page opens anywhere; readers without your fonts see the fallback.
 - A file with problems is skipped with a warning; am theme check <name|file.json> tells you why.
 
 am theme check <name|file.json> [--no-open]
@@ -592,6 +614,46 @@ async function cmdPatch(htmlArg, fromArg, opts, ctx) {
   }
   if (!emit(result, file, ctx, { note: video ? ' (an MP4 or WebM with the same name is not updated; run am video --mp4 or --webm again if you need it)' : '', inPlace: true })) return 1;
   return finish(file, opts, config, ctx);
+}
+
+async function cmdExport(arg, opts, ctx) {
+  const { fail, print, env, io } = ctx;
+  const empty = opts.pdf === '' ? '--pdf' : opts.png === '' ? '--png' : null;
+  if (empty) {
+    fail(`✗ ${empty} needs a path`);
+    return 2;
+  }
+  if (opts.pdf === undefined && opts.png === undefined) {
+    fail('✗ export needs --pdf <file.pdf> or --png <dir>\n\n  am export <page.html> --pdf <file.pdf> | --png <dir>');
+    return 2;
+  }
+  if (!arg) {
+    fail('✗ Missing the page argument: pass the .html file am render wrote');
+    return 2;
+  }
+  const cwd = io.cwd ?? process.cwd();
+  const file = resolve(cwd, arg);
+  let isPage;
+  try {
+    isPage = isHtmlPage(file);
+  } catch (e) {
+    fail(`✗ Cannot read the page ${arg}: ${e.message}`);
+    return 2;
+  }
+  if (!isPage) {
+    fail(`✗ ${arg} is not an existing .html file: am export takes a page am render wrote`);
+    return 2;
+  }
+  const pdf = opts.pdf === undefined ? undefined : resolve(cwd, opts.pdf);
+  const png = opts.png === undefined ? undefined : resolve(cwd, opts.png);
+  try {
+    await exportPage(file, { pdf, png, env, onFile: (f) => print(`✓ ${f}`) });
+    return 0;
+  } catch (e) {
+    if (!(e instanceof ExportError)) throw e;
+    fail(`✗ Export failed: ${e.message}`);
+    return 1;
+  }
 }
 
 async function cmdVideo(src, opts, ctx, from) {
@@ -701,7 +763,16 @@ function outputPath(dir, title, opts, { env, io, fail }) {
     }
     return file;
   }
-  return join(amHome(env), dir, `${slug(title)}-${stamp(new Date(io.now?.() ?? Date.now()))}.html`);
+  const file = join(amHome(env), dir, `${slug(title)}-${stamp(new Date(io.now?.() ?? Date.now()))}.html`);
+  return opts.replace === undefined ? unusedPagePath(file) : file;
+}
+
+// A default name that does not exist yet: a second page in the same second gets -2, -3 … before .html.
+function unusedPagePath(file) {
+  for (let n = 1; ; n++) {
+    const candidate = n === 1 ? file : file.replace(/\.html$/, `-${n}.html`);
+    if (!existsSync(candidate)) return candidate;
+  }
 }
 
 // Write a page. A page inside the data directory makes it private first; a page saved elsewhere (-o) leaves its folder alone.
@@ -1070,12 +1141,13 @@ function cmdHelp(name, { print, fail }) {
   if (name === 'image') return print(IMAGE_HELP), 0;
   if (name === 'code') return print(CODE_HELP), 0;
   if (name === 'video') return print(VIDEO_FORMAT), 0;
+  if (name === 'export') return print(EXPORT_HELP), 0;
   if (name === 'patch') return print(PATCH_HELP), 0;
   if (name === 'theme') return print(THEME_HELP), 0;
   if (name === 'html' || name === 'svg') return print(RAW_HELP.replace(/LANG/g, name)), 0;
   const comp = COMPONENTS.get(name);
   if (!comp) {
-    fail(`✗ No component named "${name}". Available: ${[...COMPONENTS.keys()].join(', ')}, html, svg, format, code, image, video, patch, theme`);
+    fail(`✗ No component named "${name}". Available: ${[...COMPONENTS.keys()].join(', ')}, html, svg, format, code, image, video, export, patch, theme`);
     return 2;
   }
   print(`${comp.name} — ${comp.summary}\n\n${comp.syntax}\n\nExample:\n${comp.example}`);
@@ -1083,8 +1155,12 @@ function cmdHelp(name, { print, fail }) {
 }
 
 function slug(title) {
-  const s = String(title || 'page').trim().replace(/[^\p{L}\p{N}]+/gu, '-').replace(/^-+|-+$/g, '').slice(0, 40);
-  return s || 'page';
+  const s = String(title || '').replace(/[^A-Za-z0-9]+/g, '-').toLowerCase().replace(/^-+|-+$/g, '');
+  if (!s) return 'page';
+  if (s.length <= 24) return s;
+  const cut = s.slice(0, 24);
+  const at = cut.lastIndexOf('-');
+  return at > 0 ? cut.slice(0, at) : cut;
 }
 
 function stamp(d) {

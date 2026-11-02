@@ -299,8 +299,10 @@ function heroFallback() {
   $('.demo-status', demo).textContent = UI.fallback;
   $('.demo-note', demo).innerHTML = UI.fallbackNote;
 }
-const pageScript = { catalog: './catalog.js', theme: './theme.js', editor: './editor.js' }[root.dataset.page] ?? './playground.js';
-idle(() => import(pageScript).catch((err) => {
+// The changelog page has no script of its own; a page with no data-page is the home page and loads the playground.
+const PAGE_SCRIPTS = { catalog: './catalog.js', theme: './theme.js', editor: './editor.js', changelog: null };
+const pageScript = root.dataset.page in PAGE_SCRIPTS ? PAGE_SCRIPTS[root.dataset.page] : './playground.js';
+if (pageScript) idle(() => import(pageScript).catch((err) => {
   console.error(`${pageScript} failed to load`, err);
   heroFallback();
 }), { timeout: 900 });

@@ -18,9 +18,7 @@ export function composeCanvas(read) {
 }
 
 export function composeRuntime(read) {
-  const scripts = `${read('page.js')}(() => {\n${unexport(read('reply-text.js'))}\n${unexport(read('rtl-letter.js'))}\n${unimport(unexport(read('reply-view.js')))}\n${read('reply.js')}})();\n(() => {\n${unexport(read('remark-text.js'))}\n${read('remark.js')}})();\n${read('fold.js')}
-${read('drag.js')}
-(() => {\n${unexport(read('layout-plan.js'))}\n${read('layout-dom.js')}})();\n`;
+  const scripts = `${read('page.js')}(() => {\n${unexport(read('reply-text.js'))}\n${unexport(read('rtl-letter.js'))}\n${unimport(unexport(read('reply-view.js')))}\n${read('reply.js')}})();\n(() => {\n${unexport(read('remark-text.js'))}\n${read('remark.js')}})();\n${read('fold.js')}\n${read('drag.js')}\n(() => {\n${unexport(read('layout-plan.js'))}\n${read('layout-dom.js')}})();\n${read('outline.js')}`;
   // math-text.js is read by the reply script and by the remark script, so it sits around both.
   return `(() => {\n${unexport(read('math-text.js'))}\n${scripts}})();\n`;
 }

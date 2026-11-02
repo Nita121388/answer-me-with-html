@@ -1,5 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { renderDoc } from '../src/render.js';
 import { parseDoc, parseDocLoose, ParseError, DraftErrors, applyOverrides } from '../src/parse.js';
 
 const SAMPLE = `---
@@ -302,4 +303,46 @@ test('parseDocLoose: returns the document and the collected table errors', () =>
 
 test('error: an unclosed fence still stops at once, even after a broken table', () => {
   assert.throws(() => parseDocLoose('## A\n| a | b |\n| 1 | 2 |\n```flow\nA -> B'), (err) => err instanceof ParseError && err.line === 4);
+});
+
+const blocksOf = (src) => parseDoc(src).panels[0].blocks;
+const BT = '```';
+
+test('a ::: block with a component name parses to the same block as the fenced form', () => {
+  const colon = blocksOf('## A\n:::callout ok Done\nIt works.\n:::\nAfter.');
+  const fenced = blocksOf(`## A\n${BT}callout ok Done\nIt works.\n${BT}\nAfter.`);
+  assert.deepEqual(colon, fenced);
+  assert.equal(colon[0].type, 'fence');
+});
+
+test('a ::: block keeps ``` lines in its body, and the component name is case-insensitive', () => {
+  const [block] = blocksOf('## A\n:::Flow LR\nA -> B\n```\nB -> C\n:::');
+  assert.deepEqual([block.lang, block.args, block.text], ['flow', 'LR', 'A -> B\n```\nB -> C']);
+});
+
+test('a ::: block opened with four colons ends at a line of at least four colons', () => {
+  const [block, after] = blocksOf('## A\n::::callout ok Done\nTop\n:::\ninner\n::::\nAfter.');
+  assert.equal(block.text, 'Top\n:::\ninner');
+  assert.equal(after.type, 'md');
+});
+
+test('a ::: line with an unknown name, a bare :::, or inside a code block stays text', () => {
+  assert.deepEqual(blocksOf('## A\n:::note\ntext\n:::\n').map((b) => b.type), ['md']);
+  assert.deepEqual(blocksOf('## A\n:::\ntext\n:::\n').map((b) => b.type), ['md']);
+  assert.deepEqual(blocksOf('## A\n```markdown\n:::callout\nIt works.\n:::\n```').map((b) => b.type), ['fence']);
+  const indented = blocksOf('## A\n  ```markdown\n  :::flow\n  A -> B\n  :::\n  ```\nAfter.');
+  assert.deepEqual(indented.map((b) => b.type), ['md'], 'a fence indented by up to three spaces');
+  assert.deepEqual(blocksOf('## A\n  ```\n  code\n  ```\n:::callout\nx\n:::').map((b) => b.type), ['md', 'fence'], 'resumes after the indented fence');
+});
+
+test('error: a ::: opener with no closing line is reported at the opener, like an unclosed fence', () => {
+  assert.throws(() => parseDoc('## A\ntext\n:::callout ok Done\nIt works.'), (err) => err instanceof ParseError && err.line === 3 && /is not closed/.test(err.message));
+});
+
+test('render: a ::: callout draft gives the same page as the fenced draft', () => {
+  // The page embeds the draft source for `am patch`, so compare only what the draft renders: the <main> element.
+  const main = (src) => renderDoc(src, { theme: 'blueprint' }).html.match(/<main[\s\S]*<\/main>/)[0];
+  const colon = main('## A\n:::callout ok Done\nIt works.\n:::\n');
+  assert.ok(colon.includes('am-callout--ok'));
+  assert.equal(colon, main(`## A\n${BT}callout ok Done\nIt works.\n${BT}\n`));
 });

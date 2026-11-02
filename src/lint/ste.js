@@ -4,7 +4,8 @@
 // Japanese with kana gets only the sentence and paragraph length checks: Japanese `的` is a suffix (`基本的`, `具体的`), not the Chinese structural particle.
 // A language other than Chinese, English and Japanese gets only the language-neutral rules: sentence length (in words, or in characters for CJK text) and paragraph length.
 // Image captions (the alt text) are checked like any other text.
-// Skipped: code and inline code, math ($…$ and $$ blocks), ~~strikethrough~~ (counter-examples), table rows with a no status, headings, components other than callout.
+// Skipped: code and inline code, quotations, math ($…$ and $$ blocks), ~~strikethrough~~ (counter-examples), table rows with a no status, headings, components other than callout.
+// A quotation is someone else's words: a draft that quotes a reviewer, a log line or a spec does not have to rewrite it.
 
 import { EN_WORDS } from './wordlist.en.js';
 import { ZH_LIGHT_VERBS, ZH_CLICHES, ZH_WORDS } from './wordlist.zh.js';
@@ -69,8 +70,13 @@ export function lintDoc(doc, language) {
   return warnings;
 }
 
+// A quoted span is evidence, not the draft's own prose: drop it before the rules run. Single quotes stay, because they are usually apostrophes.
+// A span never runs past a second opening mark, so an unbalanced opening quote does not swallow the prose before a later pair.
+const QUOTED = /"[^"\n]*"|“[^“”\n]*”|「[^「」\n]*」|『[^『』\n]*』|«[^«»\n]*»|„[^„“\n]*“/g;
+
 function clean(text) {
-  return stripMath(text.replace(/~~[^~]*~~/g, '').replace(/`[^`]*`/g, ''))
+  // Inline code goes first, so a quote mark inside code never pairs with one in the prose.
+  return stripMath(text.replace(/~~[^~]*~~/g, '').replace(/`[^`]*`/g, '').replace(QUOTED, ''))
     .replace(/!\[([^\]]*)\]\([^)]*\)/g, '$1')
     .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
     .replace(/<[^>]+>/g, '')

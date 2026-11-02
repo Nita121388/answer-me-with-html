@@ -43,7 +43,7 @@ ${body}</details>
 ${inner}</section>`;
 }
 
-const RESERVED = new Set(['template', 'theme', 'style', 'mode', 'cols', 'title', 'subtitle', 'lang', 'collapse', 'drag']);
+const RESERVED = new Set(['template', 'theme', 'style', 'mode', 'cols', 'title', 'subtitle', 'lang', 'collapse', 'drag', 'outline']);
 
 // language: the page language. Its metaKeys name common keys in the page language (author in Hebrew). On a right-to-left page the value
 // sits in its own <bdi>, so a key and a value of different directions do not run together ("date7.10.2026").
