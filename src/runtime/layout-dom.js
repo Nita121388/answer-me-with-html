@@ -247,8 +247,12 @@ if (panelList().length > 1) {
   addEventListener('resize', later);
   // A reader's text size changes every panel's text widths and heights, so the sheet is planned again like a resize.
   addEventListener('am-scale', later);
-  // A panel folded or unfolded, or a panel moved: heights and reading order changed, so plan again, like a resize.
-  addEventListener('am-replan', later);
+  // A panel folded or unfolded, or a panel moved: heights and reading order changed. Plan in the same task as the change, so the
+  // reader never sees the unplanned page first; a fold also waits 150 ms otherwise, and the page would shift twice.
+  addEventListener('am-replan', () => {
+    clearTimeout(timer);
+    justify();
+  });
   addEventListener('beforeprint', () => {
     printing = true;
     toPrint();

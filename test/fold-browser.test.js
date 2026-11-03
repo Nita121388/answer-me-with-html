@@ -18,7 +18,7 @@ const SKIP = process.env.AM_E2E !== '1'
   : !CHROME ? 'no Chrome found (set AM_CHROME)' : typeof WebSocket === 'undefined' ? 'needs Node 22 (built-in WebSocket)' : false;
 
 const DESKTOP = 1440;
-const LAYOUT_WAIT_MS = 1000; // the page waits 150 ms after a fold, then plans and applies (RESIZE_DELAY in layout-dom.js)
+const LAYOUT_WAIT_MS = 1000; // a fold plans the sheet in the same task now; the wait covers fonts and the last paint
 
 const DRAFT = `---
 title: Fold check
@@ -49,6 +49,21 @@ Text.
 ## B Two
 Text.
 `;
+
+// Tall enough to scroll: folding a panel above the reader used to throw the page back to the top (#361).
+const LONG = (() => {
+  const panels = Array.from({ length: 12 }, (_, i) => {
+    const body = Array.from({ length: 8 }, (_, k) => `Paragraph ${k + 1} of panel ${String.fromCharCode(65 + i)}: middleware notes long enough to wrap onto a second line here.`).join('\n\n');
+    return `## ${String.fromCharCode(65 + i)} Panel ${i + 1}\n${body}\n`;
+  }).join('\n');
+  return `---
+title: Long fold
+cols: 3
+lang: en
+collapse: true
+---
+${panels}`;
+})();
 
 let tmp;
 let chrome;
@@ -97,6 +112,7 @@ before(async () => {
   };
   render(DRAFT, 'fold');
   render(PLAIN, 'plain');
+  render(LONG, 'long');
 
   chrome = spawn(CHROME, [
     '--headless=new', '--remote-debugging-port=0', `--user-data-dir=${join(tmp, 'profile')}`,
@@ -193,4 +209,46 @@ test('fold: a page without collapse renders no details and adds nothing to stora
   // Only this page's own key matters: other pages tested in this browser share the file:// origin's storage.
   const own = await evaluate(`localStorage.getItem('am-fold:' + location.pathname)`);
   assert.equal(own, null, 'no fold key written for a page with no folds');
+});
+
+test('fold: folding a panel above the reader keeps the page where it is', { skip: SKIP, timeout: 60000 }, async () => {
+  await open(files.long);
+  // Scroll into the middle of the page, so the first panel is above the window.
+  await evaluate('window.scrollTo(0, 900)');
+  await new Promise((r) => setTimeout(r, 300));
+  const before = JSON.parse(await evaluate(`JSON.stringify((() => {
+    const panels = [...document.querySelectorAll('.am-panel')];
+    const folded = 'panel-A';
+    const ref = panels.find((p) => p.id !== folded && p.getBoundingClientRect().bottom > 8);
+    return { folded, ref: ref.id, refTop: ref.getBoundingClientRect().top, scrollY: scrollY, headTop: document.querySelector('#panel-A summary').getBoundingClientRect().top };
+  })())`));
+  assert.ok(before.headTop < 0, 'the folded head starts above the window');
+  await evaluate(`document.querySelector('#panel-A summary').click()`);
+  await new Promise((r) => setTimeout(r, 500));
+  const after = JSON.parse(await evaluate(`JSON.stringify((() => {
+    const ref = document.getElementById(${JSON.stringify(before.ref)});
+    return { refTop: ref.getBoundingClientRect().top, scrollY: scrollY };
+  })())`));
+  // The panel the reader is looking at holds its place on the screen, and the page does not go back to the top.
+  assert.ok(Math.abs(after.refTop - before.refTop) <= 2, `the reading place moved ${(after.refTop - before.refTop).toFixed(1)}px`);
+  assert.ok(after.scrollY > 0, 'the page stayed scrolled');
+});
+
+test('fold: folding the panel the reader is looking at keeps its head under the pointer', { skip: SKIP, timeout: 60000 }, async () => {
+  await open(files.long);
+  await evaluate('window.scrollTo(0, 1400)');
+  await new Promise((r) => setTimeout(r, 300));
+  const before = JSON.parse(await evaluate(`JSON.stringify((() => {
+    const heads = [...document.querySelectorAll('.am-fold summary')];
+    const head = heads.find((h) => h.getBoundingClientRect().top > 0) ?? heads[0];
+    return { id: head.closest('.am-panel').id, top: head.getBoundingClientRect().top, scrollY: scrollY };
+  })())`));
+  await evaluate(`document.getElementById(${JSON.stringify(before.id)}).querySelector('summary').click()`);
+  await new Promise((r) => setTimeout(r, 500));
+  const after = JSON.parse(await evaluate(`JSON.stringify((() => {
+    const head = document.getElementById(${JSON.stringify(before.id)}).querySelector('summary');
+    return { top: head.getBoundingClientRect().top, scrollY: scrollY };
+  })())`));
+  // A head the reader can see stays where it is, the way a <details> folds anywhere else on the web.
+  assert.ok(Math.abs(after.top - before.top) <= 2, `the head moved ${(after.top - before.top).toFixed(1)}px`);
 });

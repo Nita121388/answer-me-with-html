@@ -49,6 +49,29 @@
 
   const replan = () => window.dispatchEvent(new Event('am-replan'));
 
+  // The reader's place on the page. A fold changes the height of its row and of every row after it, so the sheet is planned
+  // again; without this the page would jump to another place, or to the top, when that happens (#361).
+  // A head on the screen is the one the reader just clicked: the fold happens where they look, and the page keeps that head in
+  // place. A head above the screen belongs to a panel they already read: then the first panel below it holds its place, so the
+  // text they are reading does not move.
+  const anchorOf = (panel) => {
+    for (const el of document.querySelectorAll('.am-panel')) {
+      if (el === panel) continue;
+      const rect = el.getBoundingClientRect();
+      if (rect.bottom > 8) return { el, top: rect.top };
+    }
+    return null;
+  };
+  // Put the anchor panel back where it was on the screen. The offset is read from the page as it stands now, so it also works
+  // when the browser already moved the scroll position while the sheet was rebuilt.
+  const holdPlace = (anchor) => {
+    if (!anchor || !anchor.el.isConnected) return;
+    const moved = anchor.el.getBoundingClientRect().top - anchor.top;
+    if (Math.abs(moved) >= 1) window.scrollBy(0, moved);
+  };
+  // A click that folds a panel records the place first: the toggle event comes after the height has already changed.
+  let foldAnchor = null;
+
   // A fold can make the head a <summary>, and a click on a <summary> folds the panel unless the click lands on an interactive
   // element. The comment button is such an element, but its icon is an <svg>, and the browser decides from the element that was
   // actually hit: an icon that swallows the pointer would fold the panel instead of opening the comment. So the icon is painted
@@ -56,7 +79,20 @@
   for (const fold of folds) {
     fold.addEventListener('click', (e) => {
       const control = e.target.closest?.('button, a, input, textarea, select, label');
-      if (control && fold.querySelector('summary')?.contains(control)) e.preventDefault();
+      if (control && fold.querySelector('summary')?.contains(control)) {
+        e.preventDefault();
+        return;
+      }
+      if (!control) {
+        const panel = fold.closest('.am-panel');
+        const head = fold.querySelector('summary')?.getBoundingClientRect();
+        // A head the reader can see is the one they just clicked: hold that panel's own top, so the head stays under the pointer
+        // and the content below it moves up the way a fold does anywhere else. A head above the window belongs to a panel they
+        // already read: hold the first panel below it instead, so the text they are reading does not move.
+        foldAnchor = head && head.top >= -4
+          ? (panel ? { el: panel, top: panel.getBoundingClientRect().top } : null)
+          : anchorOf(panel);
+      }
     }, true);
   }
 
@@ -67,7 +103,13 @@
       if (!id) return;
       state[id] = fold.open;
       save(state);
+      const anchor = foldAnchor;
+      foldAnchor = null;
       replan();
+      holdPlace(anchor);
+      // Planning rebuilds the grid, so the head loses the focus it had; give it back without letting the browser scroll to it.
+      const summary = fold.querySelector('summary');
+      if (summary && !summary.contains(document.activeElement)) summary.focus({ preventScroll: true });
     });
   }
 
