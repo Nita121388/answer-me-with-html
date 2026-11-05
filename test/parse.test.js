@@ -346,3 +346,66 @@ test('render: a ::: callout draft gives the same page as the fenced draft', () =
   assert.ok(colon.includes('am-callout--ok'));
   assert.equal(colon, main(`## A\n${BT}callout ok Done\nIt works.\n${BT}\n`));
 });
+
+// Sub-panels: a panel that declares {nest} splits its body at the third-level headings. Every draft written before this existed
+// keeps its ### headings, so these tests pin both the new split and the unchanged reading.
+const NESTED = `---
+title: Nested
+---
+## A Parent {nest}
+Lead text.
+
+### A1 Client {collapsed}
+Client body.
+
+### Server
+Server body.
+
+#### Detail
+Still a heading.
+
+## B Plain
+### Not a sub-panel
+Body.
+`;
+
+test('nest: {nest} turns the ### headings into sub-panels, and the lead text stays in the parent', () => {
+  const doc = parseDoc(NESTED);
+  const [a, b] = doc.panels;
+  assert.equal(a.attrs.nest, true);
+  assert.deepEqual(a.children.map((c) => c.id), ['A1', 'A2']);
+  assert.deepEqual(a.children.map((c) => c.title), ['Client', 'Server']);
+  assert.equal(a.children[0].attrs.collapsed, true);
+  // The parent keeps what came before its first sub-panel; each sub-panel owns what follows it.
+  assert.match(a.blocks.map((x) => x.text).join('\n'), /Lead text\./);
+  assert.equal(a.children[0].blocks.map((x) => x.text).join('\n').trim(), 'Client body.');
+  assert.deepEqual(b.children, [], 'a panel without {nest} has no sub-panels');
+});
+
+test('nest: a #### inside a sub-panel stays a heading, and a ### inside a plain panel stays body text', () => {
+  const doc = parseDoc(NESTED);
+  const [a, b] = doc.panels;
+  assert.match(a.children[1].blocks.map((x) => x.text).join('\n'), /\#\#\#\# Detail\nStill a heading\./);
+  assert.equal(a.children.length, 2, 'a #### starts no sub-panel');
+  assert.match(b.blocks.map((x) => x.text).join('\n'), /^### Not a sub-panel/);
+});
+
+test('nest: an explicit sub-panel ID is kept, and a duplicate is refused', () => {
+  const doc = parseDoc(NESTED);
+  assert.equal(doc.panels[0].children[0].id, 'A1', 'the author wrote A1');
+  assert.equal(doc.panels[0].children[1].id, 'A2', 'the second one is numbered by its place');
+  const twice = `---\ntitle: T\n---\n## A P {nest}\n### A1 One\nx\n### A1 Two\ny\n`;
+  assert.throws(() => parseDoc(twice), (e) => e instanceof ParseError && /Duplicate panel ID "A1"/.test(e.message));
+});
+
+test('nest: a sub-panel ID that meets a top-level panel ID is refused', () => {
+  const clash = `---\ntitle: T\n---\n## A1 Top\nx\n## B P {nest}\n### A1 Child\ny\n`;
+  assert.throws(() => parseDoc(clash), (e) => e instanceof ParseError && /Duplicate panel ID "A1"/.test(e.message));
+});
+
+test('nest: a page without {nest} renders exactly as it did before sub-panels existed', () => {
+  const plain = `---\ntitle: T\n---\n## A One\n### Small heading\nbody\n`;
+  const doc = parseDoc(plain);
+  assert.deepEqual(doc.panels[0].children, []);
+  assert.equal(renderDoc(plain).html.includes('<h3>Small heading</h3>'), true, 'the ### is still a heading in the page');
+});

@@ -31,7 +31,7 @@ export function panelHtml(panel, { cols = 3, grid = true, hints = {}, folds = fa
     : `${grip}<span class="am-panel-id">${esc(panel.id)}</span><h2>${esc(panel.title)}</h2>${meta}`;
   // A bare panel has no title bar at all, so it cannot fold: there is nothing to click.
   const isFold = fold && !attrs.bare;
-  const body = `<div class="am-panel-body">${panel.html}</div>`;
+  const body = `<div class="am-panel-body">${panel.html}${subPanels(panel)}</div>`;
   const inner = isFold
     ? `<details class="am-fold"${attrs.collapsed === true ? '' : ' open'}><summary class="am-panel-head">${head}</summary>
 ${body}</details>
@@ -43,7 +43,29 @@ ${body}</details>
 ${inner}</section>`;
 }
 
-const RESERVED = new Set(['template', 'theme', 'style', 'mode', 'cols', 'title', 'subtitle', 'lang', 'collapse', 'drag', 'outline']);
+// A sub-panel is a panel inside a panel ({nest} in the draft): it shares the head, the body and the fold, and differs in three
+// ways. Its class is am-subpanel, not am-panel, so the sheet layout never plans it as a cell of the grid; its head is an h3 under
+// the parent's h2; and it never takes a grip or a grid span, because it has no row of its own to sit in.
+// A sub-panel folds only when the draft says so: the page-level `collapse` belongs to the panels the reader skims first.
+function subPanels(panel) {
+  const children = panel.children ?? [];
+  if (!children.length) return '';
+  return `\n${children.map((child) => {
+    const attrs = child.attrs ?? {};
+    const fold = attrs.collapse === true || attrs.collapsed === true;
+    const head = `<span class="am-panel-id">${esc(child.id)}</span><h3>${esc(child.title)}</h3>`;
+    const body = `<div class="am-panel-body">${child.html}</div>`;
+    const inner = fold
+      ? `<details class="am-fold am-fold--sub"${attrs.collapsed === true ? '' : ' open'}><summary class="am-panel-head am-panel-head--sub">${head}</summary>
+${body}</details>`
+      : `<header class="am-panel-head am-panel-head--sub">${head}</header>
+${body}`;
+    return `<section class="am-subpanel" id="panel-${esc(child.id)}" data-am-parent="${esc(panel.id)}">
+${inner}</section>`;
+  }).join('\n')}`;
+}
+
+const RESERVED = new Set(['template', 'theme', 'style', 'mode', 'cols', 'title', 'subtitle', 'lang', 'collapse', 'drag', 'outline', 'nest']);
 
 // language: the page language. Its metaKeys name common keys in the page language (author in Hebrew). On a right-to-left page the value
 // sits in its own <bdi>, so a key and a value of different directions do not run together ("date7.10.2026").

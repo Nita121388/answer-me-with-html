@@ -100,6 +100,31 @@ code, pre, kbd { font-family: var(--font-mono); }
 @media (prefers-reduced-motion: reduce) {
   .am-fold > .am-panel-head::after { transition: none; }
 }
+
+/* ── Sub-panels: a panel inside a panel ({nest}) ──────── */
+/* A sub-panel is not a cell of the sheet: it lives in its parent's body and is as wide as that body. A rail on the inline
+   start says "these belong to the panel above"; the head is one step lighter than a panel head, because the reader has
+   already chosen the panel it sits in. */
+.am-subpanel {
+  margin-top: 14px;
+  border-inline-start: 3px solid var(--line-2);
+  padding-inline-start: 12px;
+}
+.am-subpanel:first-child { margin-top: 12px; }
+.am-subpanel .am-subpanel { margin-top: 10px; padding-inline-start: 10px; }
+.am-panel-head--sub { min-height: 30px; border-bottom-color: var(--line-2); }
+.am-panel-head--sub .am-panel-id {
+  min-width: 28px; padding: 0 6px; background: transparent; color: var(--ink-3);
+  font: var(--am-fs-label)/1 var(--font-mono); font-weight: 600;
+}
+.am-panel-head--sub h3 { margin: 0; padding: 6px 10px; font-size: var(--am-fs-small); font-weight: 600; flex: 1; display: flex; align-items: center; }
+/* Only a sub-panel that can fold says so with a pointer: a plain one is a heading, not a control. */
+.am-subpanel > header.am-panel-head--sub { cursor: default; }
+.am-subpanel > header.am-panel-head--sub:hover { background: none; }
+@media print {
+  .am-subpanel { border-inline-start-color: var(--line); padding-inline-start: 10px; }
+  .am-subpanel > .am-fold > .am-panel-head::after { display: none; }
+}
 /* ── Moving a panel ──────────────────────── */
 /* The grip is a button in the panel head (src/templates/panel.js); src/runtime/drag.js moves the panel from it with the pointer,
    or with the arrow keys while it has focus. It is drawn with a repeating background so no icon font or image is needed. */

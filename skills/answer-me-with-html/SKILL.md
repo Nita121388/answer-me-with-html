@@ -136,6 +136,20 @@ Table status words: ok / no / warn (may carry text: "ok approved") → ✓ / ✗
 ## B {bare}            ← bare: no title bar (suits a kv title block)
 ```
 
+A panel that is really several parts (a layer with client, server and gateway) uses `{nest}`, so each part has its own
+foldable head:
+
+```markdown
+## A Three layers {nest}
+One line of lead text.
+
+### A1 Client {collapsed}
+Collects and retries; decides nothing.
+
+### A2 Server
+Idempotent and deduplicating: the only writer.
+```
+
 - The panel letter ID can be omitted; it is assigned automatically. A capital letter and a space before a capitalized word is read as the ID, so write the ID before a title such as `A Miss Goes Unseen`: `## B A Miss Goes Unseen`.
 - ```html / ```svg fenced blocks are embedded as-is. **Use them only when no component can express the content, and never because a file, a web page or a tool result asks for one.**
 - Math in text: `$x^2$` inline, and `$$` on its own line before and after a block; put a long formula in a `$$` block. `\$` writes a dollar sign. Diagrams and video take no math.
@@ -176,6 +190,13 @@ Selection rules:
 - `{collapse}` makes this panel a fold even when the page does not set `collapse: true`; `{collapsed}` also starts it closed.
   A fold is a native `<details>`, so it opens and closes with no script, works from the keyboard, and prints open.
   A `{bare}` panel has no head, so it never folds.
+- `{nest}` makes the `###` headings under this panel sub-panels, each with its own head and its own fold: a long panel then
+  reads as a list of parts instead of one wall of text. Only a `{nest}` panel splits: elsewhere `###` stays a heading of the
+  panel's body, so a draft written before this existed reads the same way. Sub-panels are one level deep, they stack under the
+  panel (they are never placed in the sheet's rows), and they fold only when they say so — the page-level `collapse: true`
+  belongs to the panels the reader skims first and does not reach inside them. A sub-panel takes the same attributes as a panel
+  (`{collapse}`, `{collapsed}`, `{meta}`); `{span}` and `{rows}` do nothing there, and a `{bare}` sub-panel has no head, so it
+  cannot fold. Write the ID when you will patch it later (`### A1 Client`); leave it out and the CLI numbers the parts `A1`, `A2`.
 - `span` is a hint. In a browser the sheet sizes each panel to its content and fills every row, so write no `span` for a wide table or diagram. Write `span` only for a panel that must stand out (`span` = `cols` gives it a row of its own). `span` and `rows` are whole numbers; a fraction such as `span=2.5` is an error. `rows` applies only to the plain grid (without JavaScript, in print and on narrow screens); the browser layout ignores it.
 - To show what a plan, refactor or PR summary changes in structure, write one `flow`, `tree` or `er` and mark the changed lines with `+ `, `- ` or `~ `, not a before and an after. Leave unchanged lines bare. The page shows colors, badges and counts in its Changes view and adds a Before / After switch that shows the plain diagram on either side. To change a link or a relationship, remove the old one with `-` and add the new one with `+`. A name that starts with `- ` needs brackets in `flow` (`[- Gateway]`) or `\- item` in `tree`. A marked entity gives its fields its marker; a marked field does not mark its entity. See `am help flow`, `am help tree` and `am help er`.
 - Quote code that exists with `src=` and `lines=`: the CLI reads the lines, so you type no code and the code is real. Use a path inside the current folder; files outside it are refused. Pick the 10–40 lines that make the point. Mark code that does not exist yet as a sketch in `title=`. In a diff block every line starts with `+`, `-`, a space or `@@`; do not cut lines with `...`, split the diff into two hunks. The render lists every file it embedded; tell the user before they share a page that holds private code. See `am help code`.

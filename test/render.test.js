@@ -694,3 +694,42 @@ test('render: a doc page with fewer than 3 panels has no rail, and outline is no
   assert.doesNotMatch(renderDoc(RAIL('outline: left\n', 2)).html, /<nav class="am-toc"/);
   assert.doesNotMatch(renderDoc(RAIL('outline: left\n')).html, /<div class="am-head-meta">/);
 });
+
+// Sub-panels ({nest}): a panel inside a panel. They sit in the parent's body, so the sheet layout must not see them as cells, and
+// the page-level collapse setting belongs to the panels the reader skims first, not to what sits inside them.
+test('nest: sub-panels render inside the parent body as am-subpanel with an h3 head', () => {
+  const src = `---\ntitle: T\n---\n## A Parent {nest}\nlead\n\n### A1 Client\nclient body\n\n### Server\nserver body\n`;
+  const { html } = renderDoc(src);
+  assert.equal((html.match(/<section class="am-panel[ "]/g) || []).length, 1, 'a sub-panel is not a panel of the grid');
+  assert.equal((html.match(/<section class="am-subpanel"/g) || []).length, 2);
+  assert.match(html, /<section class="am-subpanel" id="panel-A1" data-am-parent="A">/);
+  assert.match(html, /<span class="am-panel-id">A1<\/span><h3>Client<\/h3>/);
+  // The sub-panels sit after the parent's own text, inside its body div.
+  const body = html.slice(html.indexOf('id="panel-A"'));
+  const lead = body.indexOf('lead');
+  const firstSub = body.indexOf('am-subpanel');
+  assert.ok(lead > 0 && lead < firstSub, 'the lead text comes before the first sub-panel');
+});
+
+test('nest: a sub-panel folds only when the draft says so, and the page-level collapse does not reach it', () => {
+  const plain = renderDoc(`---\ntitle: T\n---\n## A P {nest}\n### A1 One\nx\n`).html;
+  assert.match(plain, /<section class="am-subpanel" id="panel-A1" data-am-parent="A">\n<header class="am-panel-head am-panel-head--sub">/, 'no attribute, no fold');
+  const folded = renderDoc(`---\ntitle: T\n---\n## A P {nest}\n### A1 One {collapsed}\nx\n`).html;
+  assert.match(folded, /<details class="am-fold am-fold--sub"><summary class="am-panel-head am-panel-head--sub">/, '{collapsed} folds and starts closed');
+  const open = renderDoc(`---\ntitle: T\n---\n## A P {nest}\n### A1 One {collapse}\nx\n`).html;
+  assert.match(open, /<details class="am-fold am-fold--sub" open>/, '{collapse} folds and starts open');
+  // collapse: true folds the panel, never the sub-panel inside it.
+  const page = renderDoc(`---\ntitle: T\ncollapse: true\n---\n## A P {nest}\n### A1 One\nx\n`).html;
+  assert.match(page, /<details class="am-fold" open><summary class="am-panel-head">/, 'the panel folds');
+  assert.match(page, /<header class="am-panel-head am-panel-head--sub">/, 'the sub-panel does not');
+});
+
+test('nest: a panel without {nest} renders byte for byte as before', () => {
+  const html = renderDoc(`---\ntitle: T\n---\n## A One\n### Small\nbody\n`).html;
+  // A lone panel is widened to fill its row, so its class and style vary; what matters is that no attribute was added.
+  assert.match(html, /<section class="am-panel[^"]*" id="panel-A"( style="[^"]*")?>/, 'the panel keeps its attributes');
+  assert.equal(html.includes('data-am-panel'), false, 'no extra attribute on the panel');
+  // The inlined stylesheet names .am-subpanel, so look for the element, not the word.
+  assert.equal(/<section class="am-subpanel"/.test(html), false);
+  assert.equal(/class="am-panel-head--sub"/.test(html), false);
+});

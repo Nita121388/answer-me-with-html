@@ -90,7 +90,12 @@ export function renderDoc(source, overrides = {}, defaults = {}, { themes = BUIL
     }
   }
   const introHtml = renderBlocks(doc.intro.filter((b) => b !== canvasFence && !loose.includes(b)), ctx);
-  const panels = doc.panels.map((p) => ({ ...p, html: renderBlocks(p.blocks, ctx) }));
+  const panels = doc.panels.map((p) => ({
+    ...p,
+    html: renderBlocks(p.blocks, ctx),
+    // A sub-panel renders its own blocks the same way; the template decides how it sits inside its parent.
+    children: (p.children ?? []).map((c) => ({ ...c, html: renderBlocks(c.blocks, ctx) })),
+  }));
   raiseAll(errors);
   const page = TEMPLATES[doc.meta.template]({ meta: doc.meta, introHtml, panels, ui, language, edges: canvasEdges });
   // A right-to-left page isolates each run of text with no right-to-left letter as left to right (src/bidi.js).

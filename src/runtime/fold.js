@@ -12,7 +12,10 @@
 
   const storeKey = `am-fold:${location.pathname}`;
   // A page with no folds never writes this key, so an ordinary page adds nothing to storage.
-  const panelId = (fold) => fold.closest('.am-panel')?.id ?? '';
+  // The nearest board holds its own state: a sub-panel folds under its own ID ("panel-A1") and never touches the panel that
+  // holds it. The ID keeps its "panel-" prefix, exactly as it was stored before sub-panels existed, so a reader's saved folds
+  // still open the panels they closed.
+  const panelId = (fold) => fold.closest('.am-panel, .am-subpanel')?.id ?? '';
 
   const load = () => {
     try {
@@ -46,6 +49,10 @@
   // `restoring` keeps the programmatic open/close above and the print expansion below out of the stored state: those are not
   // the reader's choices.
   let restoring = false;
+  // What each fold showed once the reader's saved state was in place. A browser also fires `toggle` for a <details> that starts
+  // open, and the restore above fires one more; neither is a choice. Only a state that differs from this one is stored, so the
+  // record holds the panels the reader touched and nothing else.
+  const shown = new Map(folds.map((fold) => [fold, fold.open]));
 
   const replan = () => window.dispatchEvent(new Event('am-replan'));
 
@@ -99,6 +106,8 @@
   for (const fold of folds) {
     fold.addEventListener('toggle', () => {
       if (restoring) return;
+      if (shown.get(fold) === fold.open) return;
+      shown.set(fold, fold.open);
       const id = panelId(fold);
       if (!id) return;
       state[id] = fold.open;

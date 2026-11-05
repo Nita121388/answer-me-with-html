@@ -8,7 +8,9 @@
 const grid = document.querySelector('.am-grid');
 // The panel list is read again on every pass: a reader can reorder the panels (src/runtime/drag.js) without this file being reloaded.
 // A panel sits either in the grid or in an .am-col box that apply() made, so the list is a query and not grid.children.
-const panelList = () => (grid ? [...grid.querySelectorAll('.am-panel')] : []);
+// Only the panels that sit in the grid are cells of the sheet: a sub-panel ({nest}) lives inside its parent's body and is laid
+// out by the parent's width, so planning it would rewrite a width the reader never asked about.
+const panelList = () => (grid ? [...grid.querySelectorAll(':scope > .am-panel')] : []);
 
 if (panelList().length > 1) {
   const SINGLE_COLUMN = '(max-width: 760px)'; // the single-column breakpoint in src/themes/base.css

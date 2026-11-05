@@ -82,7 +82,8 @@
     return text;
   };
 
-  const panelOf = (el) => el.closest('.am-panel')?.id.replace(/^panel-/, '') ?? '';
+  // The nearest board, so a remark on text inside a sub-panel names that sub-panel (A1) and not the panel around it (A).
+  const panelOf = (el) => (el.closest('.am-panel, .am-subpanel')?.id ?? '').replace(/^panel-/, '');
   // Block keys, in page order. Built when first needed: a page nobody marked pays nothing.
   let keys = null;
   const keyMap = () => {

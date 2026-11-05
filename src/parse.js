@@ -74,6 +74,9 @@ const COLON_CLOSE = /^ {0,3}(:{3,})\s*$/;
 // line inside one stays text.
 const INDENTED_FENCE = /^ {1,3}(`{3,}|~{3,})/;
 const PANEL_HEADING = /^##\s+(.+?)\s*$/;
+// A sub-panel: the third-level heading inside a panel that declares {nest}. Without {nest} the line stays a heading of the
+// panel's body, so a draft written before sub-panels existed reads the same way.
+const SUB_HEADING = /^ {0,3}###\s+(.+?)\s*$/;
 const ATTR_BLOCK = /\s*\{([^{}]*)\}\s*$/;
 // A leading capital is an ID only when the title after it does not start with a lowercase letter: "## A miss goes…" and
 // "## I think…" are sentences, not ID + title (#208). The lookahead also rejects a space, so \s+ cannot backtrack past it.
@@ -133,6 +136,9 @@ function splitSections(lines, start, errors) {
   const intro = [];
   const panels = [];
   let current = { blocks: intro };
+  // The panel being filled. A sub-panel switches `current` to itself, while the parent stays here, so a later `###` is a
+  // sibling of the one before it and not a child of it: sub-panels are one level deep.
+  let panel = null;
   let mdBuf = null;
   const flushMd = () => {
     if (mdBuf && mdBuf.lines.some((l) => l.trim())) {
@@ -181,9 +187,19 @@ function splitSections(lines, start, errors) {
     const heading = line.match(PANEL_HEADING);
     if (heading) {
       flushMd();
-      current = { ...parseHeading(heading[1]), heading: line.trim(), line: i + 1, blocks: [] };
+      current = { ...parseHeading(heading[1]), heading: line.trim(), line: i + 1, blocks: [], children: [] };
+      panel = current;
       errors.push(...Object.entries(current.attrs).map(([key, value]) => fractionalCount(key, value, i + 1, PANEL_COUNTS)).filter(Boolean));
       panels.push(current);
+      continue;
+    }
+    const sub = line.match(SUB_HEADING);
+    if (sub && panel?.attrs.nest === true) {
+      flushMd();
+      const child = { ...parseHeading(sub[1]), heading: line.trim(), line: i + 1, blocks: [] };
+      errors.push(...Object.entries(child.attrs).map(([key, value]) => fractionalCount(key, value, i + 1, PANEL_COUNTS)).filter(Boolean));
+      panel.children.push(child);
+      current = child;
       continue;
     }
     if (!mdBuf) mdBuf = { line: i + 1, lines: [] };
@@ -297,8 +313,7 @@ function assignIds(panels) {
   // Auto-assigned IDs skip them below; an explicit ID always wins.
   const used = new Set();
   const firstById = new Map();
-  for (const panel of panels) {
-    if (!panel.id) continue;
+  const taken = (panel) => {
     const first = firstById.get(panel.id);
     if (first) {
       throw new ParseError(
@@ -308,6 +323,10 @@ function assignIds(panels) {
     }
     firstById.set(panel.id, panel);
     used.add(panel.id);
+  };
+  for (const panel of panels) {
+    if (!panel.id) continue;
+    taken(panel);
   }
   let code = 'A'.charCodeAt(0);
   // Past Z the ID is "P27", "P28" …, not the character the code points at, so build the ID first and test that:
@@ -320,7 +339,31 @@ function assignIds(panels) {
     code++;
     return id;
   };
-  return panels.map((p) => (p.id ? p : { ...p, id: nextFree() }));
+  const withIds = panels.map((p) => (p.id ? p : { ...p, id: nextFree() }));
+  // A sub-panel shares the namespace of the panels: an explicit ID is checked against all of them, and an automatic one is the
+  // parent's ID plus its place among the children ("A1", "A2"), so a sub-panel can be named in a patch and two parents never
+  // hand out the same one.
+  for (const panel of withIds) {
+    if (!panel.children?.length) continue;
+    let place = 0;
+    for (const child of panel.children) {
+      place += 1;
+      if (child.id) {
+        taken(child);
+        continue;
+      }
+      let n = place;
+      let id = `${panel.id}${n}`;
+      while (used.has(id)) {
+        n += 1;
+        id = `${panel.id}${n}`;
+      }
+      place = n;
+      child.id = id;
+      used.add(id);
+    }
+  }
+  return withIds;
 }
 
 // Strip an unquoted trailing # comment; a # inside quotes is kept (title: "Issue #123").
