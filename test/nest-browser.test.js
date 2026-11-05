@@ -106,7 +106,8 @@ after(async () => {
 
 test('nest: sub-panels render inside their parent and stay out of the sheet layout', { skip: SKIP, timeout: 60000 }, async () => {
   const shape = JSON.parse(await evaluate(`JSON.stringify({
-    panels: document.querySelectorAll('.am-grid > .am-panel').length,
+    // Count by class, not by parent: the sheet layout wraps some panels in .am-col boxes, and a sub-panel is never am-panel.
+    panels: document.querySelectorAll('.am-panel').length,
     subs: document.querySelectorAll('.am-subpanel').length,
     subStyle: document.querySelector('.am-subpanel').getAttribute('style'),
     nested: document.querySelector('#panel-A1').closest('.am-panel').id,
