@@ -718,10 +718,12 @@ test('nest: a sub-panel folds only when the draft says so, and the page-level co
   assert.match(folded, /<details class="am-fold am-fold--sub"><summary class="am-panel-head am-panel-head--sub">/, '{collapsed} folds and starts closed');
   const open = renderDoc(`---\ntitle: T\n---\n## A P {nest}\n### A1 One {collapse}\nx\n`).html;
   assert.match(open, /<details class="am-fold am-fold--sub" open>/, '{collapse} folds and starts open');
-  // collapse: true folds the panel, never the sub-panel inside it.
+  // A folding page folds its sub-panels too, and {collapse=false} is how one part stays open.
   const page = renderDoc(`---\ntitle: T\ncollapse: true\n---\n## A P {nest}\n### A1 One\nx\n`).html;
   assert.match(page, /<details class="am-fold" open><summary class="am-panel-head">/, 'the panel folds');
-  assert.match(page, /<header class="am-panel-head am-panel-head--sub">/, 'the sub-panel does not');
+  assert.match(page, /<details class="am-fold am-fold--sub" open><summary class="am-panel-head am-panel-head--sub">/, 'the sub-panel folds with its page');
+  const optOut = renderDoc(`---\ntitle: T\ncollapse: true\n---\n## A P {nest}\n### A1 One {collapse=false}\nx\n`).html;
+  assert.match(optOut, /<header class="am-panel-head am-panel-head--sub">/, '{collapse=false} keeps that part open');
 });
 
 test('nest: a panel without {nest} renders byte for byte as before', () => {

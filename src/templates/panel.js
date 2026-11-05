@@ -31,7 +31,7 @@ export function panelHtml(panel, { cols = 3, grid = true, hints = {}, folds = fa
     : `${grip}<span class="am-panel-id">${esc(panel.id)}</span><h2>${esc(panel.title)}</h2>${meta}`;
   // A bare panel has no title bar at all, so it cannot fold: there is nothing to click.
   const isFold = fold && !attrs.bare;
-  const body = `<div class="am-panel-body">${panel.html}${subPanels(panel)}</div>`;
+  const body = `<div class="am-panel-body">${panel.html}${subPanels(panel, folds)}</div>`;
   const inner = isFold
     ? `<details class="am-fold"${attrs.collapsed === true ? '' : ' open'}><summary class="am-panel-head">${head}</summary>
 ${body}</details>
@@ -47,12 +47,14 @@ ${inner}</section>`;
 // ways. Its class is am-subpanel, not am-panel, so the sheet layout never plans it as a cell of the grid; its head is an h3 under
 // the parent's h2; and it never takes a grip or a grid span, because it has no row of its own to sit in.
 // A sub-panel folds only when the draft says so: the page-level `collapse` belongs to the panels the reader skims first.
-function subPanels(panel) {
+function subPanels(panel, folds = false) {
   const children = panel.children ?? [];
   if (!children.length) return '';
   return `\n${children.map((child) => {
     const attrs = child.attrs ?? {};
-    const fold = attrs.collapse === true || attrs.collapsed === true;
+    // A sub-panel folds when its page folds; a draft that leaves its page open can still fold one part with {collapse}. Either
+    // way {collapse=false} keeps that part open, so one long stretch of text can stay whole inside a folded page.
+    const fold = (folds || attrs.collapse === true || attrs.collapsed === true) && attrs.collapse !== false;
     const head = `<span class="am-panel-id">${esc(child.id)}</span><h3>${esc(child.title)}</h3>`;
     const body = `<div class="am-panel-body">${child.html}</div>`;
     const inner = fold

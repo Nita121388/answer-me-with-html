@@ -19,7 +19,10 @@ test('configPath: is AM_HOME/config.json', () => {
 });
 
 test('readConfig: returns the defaults when the file does not exist', () => {
-  assert.deepEqual(readConfig(env).values, { open: true, theme: 'auto', mode: 'auto', style: '80', voice: 'auto', update_check: true, close_after_reply: false, scale: 1 });
+  assert.deepEqual(readConfig(env).values, {
+    open: true, theme: 'auto', mode: 'auto', style: '80', voice: 'auto', update_check: true, close_after_reply: false, scale: 1,
+    template: 'sheet', cols: 3, collapse: false,
+  });
 });
 
 test('setConfig: booleans accept on/off/true/false/`开`/`关` and are written to the file', () => {
@@ -51,7 +54,10 @@ test('resetConfig: resets one key or all keys to the defaults', () => {
   setConfig('open', 'off', env);
   setConfig('theme', 'shadcn', env);
   resetConfig('open', env);
-  assert.deepEqual(readConfig(env).values, { open: true, theme: 'shadcn', mode: 'auto', style: '80', voice: 'auto', update_check: true, close_after_reply: false, scale: 1 });
+  assert.deepEqual(readConfig(env).values, {
+    open: true, theme: 'shadcn', mode: 'auto', style: '80', voice: 'auto', update_check: true, close_after_reply: false, scale: 1,
+    template: 'sheet', cols: 3, collapse: false,
+  });
   resetConfig(undefined, env);
   assert.equal(existsSync(configPath(env)), false);
 });
@@ -65,7 +71,10 @@ test('readConfig: falls back to the defaults with a warning when the file is bro
 
 test('readConfig: ignores unknown keys and invalid values', () => {
   writeFileSync(configPath(env), JSON.stringify({ open: 'yes-ish', theme: 'shadcn', extra: 1 }));
-  assert.deepEqual(readConfig(env).values, { open: true, theme: 'shadcn', mode: 'auto', style: '80', voice: 'auto', update_check: true, close_after_reply: false, scale: 1 });
+  assert.deepEqual(readConfig(env).values, {
+    open: true, theme: 'shadcn', mode: 'auto', style: '80', voice: 'auto', update_check: true, close_after_reply: false, scale: 1,
+    template: 'sheet', cols: 3, collapse: false,
+  });
 });
 
 test('scale: a number from 0.8 to 1.5 in steps of 0.05, stored as a number', () => {
@@ -102,4 +111,19 @@ test('render: config gives the defaults, explicit draft frontmatter wins', () =>
   assert.match(explicit.html, /data-theme="blueprint"/);
   const flag = renderDoc('---\ntheme: blueprint\n---\n## A\nx', { theme: 'shadcn' }, defaults);
   assert.match(flag.html, /data-theme="shadcn"/, 'command-line arguments win');
+});
+
+test('layout defaults: template, cols and collapse are settings like the others', () => {
+  resetConfig(undefined, env);
+  setConfig('template', 'doc', env);
+  setConfig('cols', '1', env);
+  setConfig('collapse', 'on', env);
+  const { values } = readConfig(env);
+  assert.equal(values.template, 'doc');
+  assert.equal(values.cols, 1);
+  assert.equal(values.collapse, true);
+  // A number setting says what it accepts, and a fraction is not a column count.
+  assert.throws(() => setConfig('cols', '2.5', env), (e) => e instanceof ConfigError && /steps of 1/.test(e.message));
+  assert.throws(() => setConfig('template', 'canvas', env), (e) => e instanceof ConfigError && /sheet \| doc/.test(e.message));
+  resetConfig(undefined, env);
 });

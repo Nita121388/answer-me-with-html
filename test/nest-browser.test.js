@@ -23,7 +23,7 @@ const LETTER = (i) => String.fromCharCode(65 + i);
 // Five panels, each holding three sub-panels; the first sub-panel of each parent starts folded, so a test has both kinds.
 const draftOf = () => {
   const panel = (i) => {
-    const fold = (k) => (k === 0 ? ' {collapsed}' : k === 1 ? ' {collapse}' : '');
+    const fold = (k) => (k === 0 ? ' {collapsed}' : k === 1 ? ' {collapse}' : ' {collapse=false}');
     const subs = Array.from({ length: CHILDREN }, (_, k) => `### ${LETTER(i)}${k + 1} Part ${k + 1}${fold(k)}
 Body of part ${k + 1} in panel ${LETTER(i)}. It runs a few words so the row has a real height.
 `).join('\n');
@@ -136,7 +136,7 @@ test('nest: a sub-panel folds on its own, without touching the panel that holds 
   assert.equal(after.sub, false, 'the sub-panel closed');
   assert.equal(after.panel, true, 'its panel stayed open');
   assert.equal(after.sibling, false, 'a sibling sub-panel keeps its own state');
-  assert.equal(after.plain, false, 'a sub-panel with no fold attribute is a heading, not a control');
+  assert.equal(after.plain, false, 'a sub-panel that writes {collapse=false} stays a heading');
   // The sub-panel stores under its own ID, and folding it writes nothing about the panel that holds it.
   assert.equal(after.stored['panel-A2'], false);
   assert.equal('panel-A' in after.stored, false, 'folding a sub-panel writes no state for its panel');
@@ -188,7 +188,7 @@ test('nest: print opens every fold, sub-panels included, and nothing overflows s
     folds: document.querySelectorAll('.am-fold').length,
     overflow: document.documentElement.scrollWidth > document.documentElement.clientWidth + 1,
   })`));
-  // A fold per panel, plus the two sub-panels of each panel that carry {collapse} or {collapsed}.
+  // A fold per panel, plus the two sub-panels of each panel that fold (the third writes {collapse=false}).
   assert.equal(printed.folds, PARENTS * 3, 'one fold per panel and per foldable sub-panel');
   assert.equal(printed.allOpen, true, 'print shows the whole page');
   assert.equal(printed.overflow, false, 'the sub-panel rail adds no sideways scroll');

@@ -23,6 +23,9 @@ export const CONFIG_KEYS = Object.freeze({
   scale: { type: 'number', min: SCALE.min, max: SCALE.max, step: SCALE.step, default: 1, label: 'Text size on the page (1 = default, 1.2 = 20% larger; diagrams and charts grow with it)' },
   update_check: { type: 'bool', default: true, label: 'Check for a new version once a day in the background and tell you (never updates by itself)' },
   close_after_reply: { type: 'bool', default: false, label: 'Close the page tab 3 seconds after the reply is copied (a Keep open button cancels it)' },
+  template: { type: 'enum', choices: ['sheet', 'doc'], default: 'sheet', label: 'Layout a draft gets when it does not say (sheet: panels in rows; doc: one column with an outline rail)' },
+  cols: { type: 'number', min: 1, max: 6, step: 1, default: 3, label: 'Columns in a sheet page when the draft does not say (1 = a single column)' },
+  collapse: { type: 'bool', default: false, label: 'Make every panel foldable unless the draft says otherwise (a panel opts out with {collapse=false}, and a sub-panel follows its page)' },
   voice: { type: 'enum', choices: VOICES, default: 'auto', label: 'Video narration voice-over (auto: ElevenLabs if ELEVENLABS_API_KEY is set, otherwise system TTS; local: the local service at AM_TTS_URL)' },
 });
 

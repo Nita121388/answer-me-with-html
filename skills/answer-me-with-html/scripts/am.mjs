@@ -8856,7 +8856,7 @@ function panelHtml(panel, { cols = 3, grid = true, hints = {}, folds = false, dr
   const grip = drag && !attrs.bare ? `<button class="am-grip" type="button" data-am="grip" aria-label="${esc(`${moveLabel} ${panel.id}`)}" title="${esc(moveLabel)}"></button>` : "";
   const head = attrs.bare ? "" : `${grip}<span class="am-panel-id">${esc(panel.id)}</span><h2>${esc(panel.title)}</h2>${meta}`;
   const isFold = fold && !attrs.bare;
-  const body = `<div class="am-panel-body">${panel.html}${subPanels(panel)}</div>`;
+  const body = `<div class="am-panel-body">${panel.html}${subPanels(panel, folds)}</div>`;
   const inner = isFold ? `<details class="am-fold"${attrs.collapsed === true ? "" : " open"}><summary class="am-panel-head">${head}</summary>
 ${body}</details>
 ` : `${attrs.bare ? "" : `<header class="am-panel-head">${head}</header>
@@ -8865,13 +8865,13 @@ ${body}</details>
   return `<section class="am-panel${cls}" id="panel-${esc(panel.id)}"${style}${data}>
 ${inner}</section>`;
 }
-function subPanels(panel) {
+function subPanels(panel, folds = false) {
   const children = panel.children ?? [];
   if (!children.length) return "";
   return `
 ${children.map((child) => {
     const attrs = child.attrs ?? {};
-    const fold = attrs.collapse === true || attrs.collapsed === true;
+    const fold = (folds || attrs.collapse === true || attrs.collapsed === true) && attrs.collapse !== false;
     const head = `<span class="am-panel-id">${esc(child.id)}</span><h3>${esc(child.title)}</h3>`;
     const body = `<div class="am-panel-body">${child.html}</div>`;
     const inner = fold ? `<details class="am-fold am-fold--sub"${attrs.collapsed === true ? "" : " open"}><summary class="am-panel-head am-panel-head--sub">${head}</summary>
@@ -10295,6 +10295,9 @@ var CONFIG_KEYS = Object.freeze({
   scale: { type: "number", min: SCALE.min, max: SCALE.max, step: SCALE.step, default: 1, label: "Text size on the page (1 = default, 1.2 = 20% larger; diagrams and charts grow with it)" },
   update_check: { type: "bool", default: true, label: "Check for a new version once a day in the background and tell you (never updates by itself)" },
   close_after_reply: { type: "bool", default: false, label: "Close the page tab 3 seconds after the reply is copied (a Keep open button cancels it)" },
+  template: { type: "enum", choices: ["sheet", "doc"], default: "sheet", label: "Layout a draft gets when it does not say (sheet: panels in rows; doc: one column with an outline rail)" },
+  cols: { type: "number", min: 1, max: 6, step: 1, default: 3, label: "Columns in a sheet page when the draft does not say (1 = a single column)" },
+  collapse: { type: "bool", default: false, label: "Make every panel foldable unless the draft says otherwise (a panel opts out with {collapse=false}, and a sub-panel follows its page)" },
   voice: { type: "enum", choices: VOICES, default: "auto", label: "Video narration voice-over (auto: ElevenLabs if ELEVENLABS_API_KEY is set, otherwise system TTS; local: the local service at AM_TTS_URL)" }
 });
 var TRUE = /* @__PURE__ */ new Set(["on", "true", "yes", "1", "\u5F00", "\u5F00\u542F", "\u6253\u5F00"]);
@@ -13064,7 +13067,8 @@ async function cmdRender(src, opts, ctx, baseDir, from) {
   await loadMath(src);
   let result;
   try {
-    result = renderDoc(src, { theme: opts.theme, template: opts.template, style: opts.style, mode: opts.mode }, { theme, mode, style }, { themes: ctx.themes, baseDir, codeDir: ctx.io.cwd ?? process.cwd(), update: updateFor(config, ctx), closeAfter: config.values.close_after_reply, scale: config.values.scale });
+    const layout4 = { template: config.values.template, cols: config.values.cols, collapse: config.values.collapse };
+    result = renderDoc(src, { theme: opts.theme, template: opts.template, style: opts.style, mode: opts.mode }, { theme, mode, style, ...layout4 }, { themes: ctx.themes, baseDir, codeDir: ctx.io.cwd ?? process.cwd(), update: updateFor(config, ctx), closeAfter: config.values.close_after_reply, scale: config.values.scale });
   } catch (e) {
     return reportDraftError(e, src, from, ctx);
   }

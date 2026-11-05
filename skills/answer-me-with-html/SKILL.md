@@ -192,11 +192,15 @@ Selection rules:
   A `{bare}` panel has no head, so it never folds.
 - `{nest}` makes the `###` headings under this panel sub-panels, each with its own head and its own fold: a long panel then
   reads as a list of parts instead of one wall of text. Only a `{nest}` panel splits: elsewhere `###` stays a heading of the
-  panel's body, so a draft written before this existed reads the same way. Sub-panels are one level deep, they stack under the
-  panel (they are never placed in the sheet's rows), and they fold only when they say so — the page-level `collapse: true`
-  belongs to the panels the reader skims first and does not reach inside them. A sub-panel takes the same attributes as a panel
-  (`{collapse}`, `{collapsed}`, `{meta}`); `{span}` and `{rows}` do nothing there, and a `{bare}` sub-panel has no head, so it
-  cannot fold. Write the ID when you will patch it later (`### A1 Client`); leave it out and the CLI numbers the parts `A1`, `A2`.
+  panel's body, so a draft written before this existed reads the same way. Sub-panels are one level deep and stack under the
+  panel (they are never placed in the sheet's rows). A sub-panel folds when its page folds, and a page that does not fold can
+  still fold one part with `{collapse}`; `{collapse=false}` keeps a part open inside a folding page — that is how one long
+  stretch of text stays whole. A sub-panel takes the same attributes as a panel (`{collapse}`, `{collapsed}`, `{meta}`);
+  `{span}` and `{rows}` do nothing there, and a `{bare}` sub-panel has no head, so it cannot fold. Write the ID when you will
+  patch it later (`### A1 Client`); leave it out and the CLI numbers the parts `A1`, `A2`.
+- The user's settings decide what a draft gets when it says nothing: `am config set template doc|sheet`, `am config set cols 1`
+  for a single column, `am config set collapse on` to make every panel foldable. A draft that writes its own `template`, `cols`
+  or `collapse` still wins over the setting.
 - `span` is a hint. In a browser the sheet sizes each panel to its content and fills every row, so write no `span` for a wide table or diagram. Write `span` only for a panel that must stand out (`span` = `cols` gives it a row of its own). `span` and `rows` are whole numbers; a fraction such as `span=2.5` is an error. `rows` applies only to the plain grid (without JavaScript, in print and on narrow screens); the browser layout ignores it.
 - To show what a plan, refactor or PR summary changes in structure, write one `flow`, `tree` or `er` and mark the changed lines with `+ `, `- ` or `~ `, not a before and an after. Leave unchanged lines bare. The page shows colors, badges and counts in its Changes view and adds a Before / After switch that shows the plain diagram on either side. To change a link or a relationship, remove the old one with `-` and add the new one with `+`. A name that starts with `- ` needs brackets in `flow` (`[- Gateway]`) or `\- item` in `tree`. A marked entity gives its fields its marker; a marked field does not mark its entity. See `am help flow`, `am help tree` and `am help er`.
 - Quote code that exists with `src=` and `lines=`: the CLI reads the lines, so you type no code and the code is real. Use a path inside the current folder; files outside it are refused. Pick the 10–40 lines that make the point. Mark code that does not exist yet as a sketch in `title=`. In a diff block every line starts with `+`, `-`, a space or `@@`; do not cut lines with `...`, split the diff into two hunks. The render lists every file it embedded; tell the user before they share a page that holds private code. See `am help code`.
