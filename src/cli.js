@@ -349,7 +349,7 @@ async function cmdRender(src, opts, ctx, baseDir, from) {
   let result;
   try {
     // The settings decide what a draft gets when it says nothing; a draft that writes template / cols / collapse still wins.
-    const layout = { template: config.values.template, cols: config.values.cols, collapse: config.values.collapse };
+    const layout = { template: config.values.template, cols: config.values.cols, collapse: config.values.collapse, width: config.values.width };
     result = renderDoc(src, { theme: opts.theme, template: opts.template, style: opts.style, mode: opts.mode }, { theme, mode, style, ...layout }, { themes: ctx.themes, baseDir, codeDir: ctx.io.cwd ?? process.cwd(), update: updateFor(config, ctx), closeAfter: config.values.close_after_reply, scale: config.values.scale });
   } catch (e) {
     return reportDraftError(e, src, from, ctx);

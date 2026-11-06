@@ -20,6 +20,7 @@ export default {
     },
     theme: '主題', modeLabel: '明暗',
     mode: { auto: '跟隨系統', light: '淺色', dark: '深色' },
+    measureLabel: '寬度', measure: { standard: '標準', wide: '寬', full: '滿寬' },
     scale: { down: '縮小文字', up: '放大文字' },
     move: '移動面板', resetOrder: '恢復原始順序',
     canvas: { zoomIn: '放大', zoomOut: '縮小', fit: '適應', reset: '重設', linkFrom: '從這裡連出去', copyEdges: '複製連線', drawio: '匯出 drawio' , fullscreen: '全螢幕', exitFullscreen: '退出全螢幕'},

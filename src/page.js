@@ -11,8 +11,16 @@ const AUDIO_OPEN = '<audio id="amv-audio"';
 // a left-to-right page keeps the root tag it always had.
 // voice is written only on voiced video pages (elevenlabs / local / system); patch keeps the same voice.
 // scale is the reader's text size (src/themes/type-scale.js); 1 is the default, so the tag carries it only when it differs.
-export function rootTag({ lang, dir, theme, mode, style, scale = 1, voice, video = false }) {
-  return `<html lang="${lang}"${dirAttr(dir)} data-theme="${esc(theme)}" data-mode="${esc(mode)}" data-style="${esc(style)}"${scale === 1 ? '' : ` data-scale="${scale}"`}${voice ? ` data-voice="${esc(voice)}"` : ''}${video ? ' data-video' : ''}>`;
+// measure: the reading width. 'wide' and 'full' are presets the stylesheet knows; a number is that many pixels, written as the
+// variable itself. 'standard' adds nothing, so a page that never asks keeps exactly the width it had.
+function measureAttrs(measure) {
+  if (measure === 'wide' || measure === 'full') return ` data-measure="${measure}"`;
+  const px = Number(measure);
+  return Number.isFinite(px) && px > 0 ? ` style="--am-measure: ${Math.round(px)}px"` : '';
+}
+
+export function rootTag({ lang, dir, theme, mode, style, scale = 1, voice, video = false, measure }) {
+  return `<html lang="${lang}"${dirAttr(dir)} data-theme="${esc(theme)}" data-mode="${esc(mode)}" data-style="${esc(style)}"${scale === 1 ? '' : ` data-scale="${scale}"`}${voice ? ` data-voice="${esc(voice)}"` : ''}${video ? ' data-video' : ''}${measureAttrs(measure)}>`;
 }
 
 // Copies of the root settings, written on the toolbar. A host that serves the page inside its own document leaves the real <html>

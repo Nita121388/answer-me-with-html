@@ -409,3 +409,16 @@ test('nest: a page without {nest} renders exactly as it did before sub-panels ex
   assert.deepEqual(doc.panels[0].children, []);
   assert.equal(renderDoc(plain).html.includes('<h3>Small heading</h3>'), true, 'the ### is still a heading in the page');
 });
+
+// Reading width: a preset the stylesheet knows, or a number of pixels. Anything else is a draft error, not a silent default.
+test('width: takes the presets and a pixel count, and refuses the rest', () => {
+  const meta = (w) => parseDoc(`---\ntitle: T\nwidth: ${w}\n---\n\n## A x\ny\n`).meta.width;
+  assert.equal(meta('standard'), 'standard');
+  assert.equal(meta('wide'), 'wide');
+  assert.equal(meta('full'), 'full');
+  assert.equal(meta('1100'), 1100, 'a pixel count becomes a number');
+  assert.equal(parseDoc('---\ntitle: T\n---\n\n## A x\ny\n').meta.width, 'standard', 'the default is the reading measure');
+  for (const bad of ['huge', '99', '9999']) {
+    assert.throws(() => meta(bad), (e) => e instanceof ParseError && /Invalid width value/.test(e.message), bad);
+  }
+});

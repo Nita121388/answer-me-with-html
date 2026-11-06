@@ -735,3 +735,14 @@ test('nest: a panel without {nest} renders byte for byte as before', () => {
   assert.equal(/<section class="am-subpanel"/.test(html), false);
   assert.equal(/class="am-panel-head--sub"/.test(html), false);
 });
+
+// The reading width reaches the page as an attribute (a preset) or as the variable itself (a pixel count), so one stylesheet
+// serves both without a second rule per number.
+test('width: a preset becomes data-measure, a pixel count becomes the variable, and standard writes nothing', () => {
+  const root = (src) => renderDoc(src).html.match(/<html[^>]*>/)[0];
+  const draft = (w) => `---\ntitle: T\ntemplate: doc\n${w ? `width: ${w}\n` : ''}---\n\n## A x\ny\n`;
+  assert.match(root(draft('wide')), / data-measure="wide"/);
+  assert.match(root(draft('full')), / data-measure="full"/);
+  assert.match(root(draft('1400')), / style="--am-measure: 1400px"/);
+  assert.equal(/data-measure|--am-measure/.test(root(draft(''))), false, 'a page that never asks is unchanged');
+});

@@ -41,7 +41,12 @@ code, pre, kbd { font-family: var(--font-mono); }
 .am-intro { margin-top: 12px; max-width: 80ch; }
 
 /* ── sheet template ────────────────────────── */
-.am-sheet { max-width: 1680px; margin: 0 auto; padding: 32px 28px 40px; }
+/* The reading width: one variable the reader, the draft and the machine can all set (src/runtime/page.js, frontmatter width:).
+   standard keeps the widths this page always had, so a draft that never asks is unchanged. */
+.am-sheet { max-width: var(--am-measure, 1680px); margin: 0 auto; padding: 32px 28px 40px; }
+html[data-measure="wide"] { --am-measure: 1680px; }
+html[data-measure="full"] { --am-measure: calc(100vw - 56px); }
+/* A doc page reads better narrower than a sheet: the same presets are read against the measure of a line, not a board. */
 .am-frame { position: relative; }
 .am-grid {
   display: grid; grid-template-columns: repeat(var(--cols, 3), minmax(0, 1fr));
@@ -553,7 +558,9 @@ body.am-has-reply-bar { padding-block-end: 72px; }
 }
 
 /* ── doc template ────────────────────────── */
-.am-doc { max-width: 916px; margin: 0 auto; padding: 40px 28px 64px; }
+.am-doc { max-width: var(--am-measure, 916px); margin: 0 auto; padding: 40px 28px 64px; }
+html[data-measure="wide"] .am-doc { max-width: min(1200px, calc(100vw - 56px)); }
+html[data-measure="full"] .am-doc { max-width: calc(100vw - 56px); }
 .am-doc-layout { position: relative; }
 /* The outline rail: a zero-height sticky strip whose child hangs 8px outside the body on the chosen side. "start" and "end" are
    logical, so the rail mirrors on a right-to-left page. data-flow says which way the label and the list open: "out" away from the
@@ -712,3 +719,12 @@ table.am-mark { background: none; }
 }
 .am-annot-float input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 @media print { .am-annot-float { display: none !important; } }
+
+/* A page printed on A4 keeps the reading measure, whatever width the reader chose on screen: a wide table or a full-window
+   board would run off the paper. */
+@media print {
+  html[data-measure], html[style*="--am-measure"] { --am-measure: 916px !important; }
+  /* The doc presets name their own max-width, so a variable alone would not reach paper: name the width here too. */
+  html[data-measure] .am-doc, html[style*="--am-measure"] .am-doc,
+  html[data-measure] .am-sheet, html[style*="--am-measure"] .am-sheet { max-width: 916px !important; }
+}

@@ -21,7 +21,7 @@ test('configPath: is AM_HOME/config.json', () => {
 test('readConfig: returns the defaults when the file does not exist', () => {
   assert.deepEqual(readConfig(env).values, {
     open: true, theme: 'auto', mode: 'auto', style: '80', voice: 'auto', update_check: true, close_after_reply: false, scale: 1,
-    template: 'sheet', cols: 3, collapse: false,
+    template: 'sheet', cols: 3, collapse: false, width: 'standard',
   });
 });
 
@@ -56,7 +56,7 @@ test('resetConfig: resets one key or all keys to the defaults', () => {
   resetConfig('open', env);
   assert.deepEqual(readConfig(env).values, {
     open: true, theme: 'shadcn', mode: 'auto', style: '80', voice: 'auto', update_check: true, close_after_reply: false, scale: 1,
-    template: 'sheet', cols: 3, collapse: false,
+    template: 'sheet', cols: 3, collapse: false, width: 'standard',
   });
   resetConfig(undefined, env);
   assert.equal(existsSync(configPath(env)), false);
@@ -73,7 +73,7 @@ test('readConfig: ignores unknown keys and invalid values', () => {
   writeFileSync(configPath(env), JSON.stringify({ open: 'yes-ish', theme: 'shadcn', extra: 1 }));
   assert.deepEqual(readConfig(env).values, {
     open: true, theme: 'shadcn', mode: 'auto', style: '80', voice: 'auto', update_check: true, close_after_reply: false, scale: 1,
-    template: 'sheet', cols: 3, collapse: false,
+    template: 'sheet', cols: 3, collapse: false, width: 'standard',
   });
 });
 
@@ -126,4 +126,13 @@ test('layout defaults: template, cols and collapse are settings like the others'
   assert.throws(() => setConfig('cols', '2.5', env), (e) => e instanceof ConfigError && /steps of 1/.test(e.message));
   assert.throws(() => setConfig('template', 'canvas', env), (e) => e instanceof ConfigError && /sheet \| doc/.test(e.message));
   resetConfig(undefined, env);
+});
+
+test('width: is a setting like template and cols, and the draft still wins', () => {
+  resetConfig(undefined, env);
+  setConfig('width', 'wide', env);
+  assert.equal(readConfig(env).values.width, 'wide');
+  assert.throws(() => setConfig('width', '1400', env), (e) => e instanceof ConfigError && /standard \| wide \| full/.test(e.message));
+  resetConfig(undefined, env);
+  assert.equal(readConfig(env).values.width, 'standard');
 });

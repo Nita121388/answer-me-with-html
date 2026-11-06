@@ -38,6 +38,8 @@ export const CHOICES = Object.freeze({
   style: ['off', '80', 'strict'],
   mode: ['auto', 'light', 'dark'],
   outline: ['left', 'right'],
+  // Reading width: a preset, or a number of pixels (checked where it is used, so 'width: 1100' is not an enum value).
+  width: ['standard', 'wide', 'full'],
 });
 
 // Command-line arguments override draft and config settings: validates values, returns a new meta without changing the original. Keys with undefined values are ignored.
@@ -62,6 +64,7 @@ const DEFAULT_META = Object.freeze({
   style: '80',
   mode: 'auto',
   outline: 'right',
+  width: 'standard',
   cols: 3,
   title: '',
 });
@@ -124,10 +127,12 @@ function parseFrontmatter(lines, base, allowed) {
   for (const [key, { value, line }] of Object.entries(entries)) {
     const fraction = fractionalCount(key, value, line, META_COUNTS);
     if (fraction) throw fraction;
-    if (allowed[key] && !allowed[key].includes(String(value))) {
+    // A width is a preset or a pixel count: 'wide', 'full', or 700 to 2400.
+    const pxWidth = key === 'width' && /^\d+$/.test(String(value)) && Number(value) >= 400 && Number(value) <= 2400;
+    if (allowed[key] && !pxWidth && !allowed[key].includes(String(value))) {
       throw new ParseError(`Invalid ${key} value "${value}". Choose one of: ${allowed[key].join(' | ')}`, line);
     }
-    meta[key] = allowed[key] ? String(value) : value;
+    meta[key] = allowed[key] ? (key === 'width' && pxWidth ? Number(value) : String(value)) : value;
   }
   return { meta, bodyStart: end + 1 };
 }

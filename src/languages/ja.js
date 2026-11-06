@@ -21,6 +21,7 @@ export default {
     },
     theme: 'テーマ', modeLabel: '表示',
     mode: { auto: '自動', light: 'ライト', dark: 'ダーク' },
+    measureLabel: '幅', measure: { standard: '標準', wide: '広い', full: '全幅' },
     scale: { down: '文字を小さく', up: '文字を大きく' },
     move: 'パネルを移動', resetOrder: '元の順序に戻す',
     canvas: { zoomIn: '拡大', zoomOut: '縮小', fit: '全体表示', reset: 'リセット', linkFrom: 'ここから線を引く', copyEdges: '接続をコピー', drawio: 'drawio 出力' , fullscreen: '全画面', exitFullscreen: '全画面を終了'},

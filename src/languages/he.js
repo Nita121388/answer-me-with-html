@@ -19,6 +19,7 @@ export default {
     },
     theme: 'ערכת עיצוב', modeLabel: 'מצב',
     mode: { auto: 'אוטומטי', light: 'בהיר', dark: 'כהה' },
+    measureLabel: 'רוחב', measure: { standard: 'רגיל', wide: 'רחב', full: 'מלא' },
     scale: { down: 'הקטנת הטקסט', up: 'הגדלת הטקסט' },
     move: 'הזזת פאנל', resetOrder: 'שחזור הסדר המקורי',
     canvas: { zoomIn: 'הגדלה', zoomOut: 'הקטנה', fit: 'התאמה', reset: 'איפוס', linkFrom: 'קישור מהפאנל הזה', copyEdges: 'העתקת קישורים', drawio: 'יצוא drawio' , fullscreen: 'מסך מלא', exitFullscreen: 'יציאה ממסך מלא'},

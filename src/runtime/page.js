@@ -14,6 +14,39 @@
     select.addEventListener('change', () => root.setAttribute(attr, select.value));
   }
 
+  // ── Reading width ─────────────────────────
+  // The toolbar list sets the presets the stylesheet knows ('standard' is the page's own width, so it only clears the attribute).
+  // A reader's choice is remembered per page, the way a fold is: a wide board for one report must not widen the next one.
+  const measure = document.querySelector('select[data-am="measure"]');
+  if (measure) {
+    const storeKey = `am-measure:${location.pathname}`;
+    const applyMeasure = (value) => {
+      if (!value || value === 'standard') root.removeAttribute('data-measure');
+      else root.setAttribute('data-measure', value);
+      // A pixel width from the draft lives in an inline variable; a preset replaces it.
+      root.style.removeProperty('--am-measure');
+    };
+    try {
+      const saved = localStorage.getItem(storeKey);
+      if (saved) {
+        measure.value = saved;
+        applyMeasure(saved);
+      }
+    } catch {
+      // Storage may be off (am serve, a private window): the choice then lasts until the tab closes.
+    }
+    measure.addEventListener('change', () => {
+      applyMeasure(measure.value);
+      try {
+        localStorage.setItem(storeKey, measure.value);
+      } catch {
+        // As above.
+      }
+      // A sheet fits its columns to the width, so the rows are planned again; a doc page has nothing to plan.
+      window.dispatchEvent(new Event('am-replan'));
+    });
+  }
+
   // ── Text size ─────────────────────────────
   // A− / A+ set --am-scale on the root; every page size and line (src/themes/type-scale.js) follows it, and the drawing boxes grow
   // with it while their viewBox keeps the units Node measured. The buttons carry the range from SCALE, so this script keeps no

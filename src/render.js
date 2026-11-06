@@ -334,7 +334,7 @@ function shell({ meta, language, body, source, embedded, update, closeAfter, sca
   const notice = updateNotice(ui, update, labelKey);
   const pick = (name, label, values, current) => `<label class="am-pick">${esc(label)}<select data-am="${name}">${values
     .map(([value, text]) => `<option value="${esc(value)}"${value === current ? ' selected' : ''}>${esc(text)}</option>`).join('')}</select></label>`;
-  const root = { lang: language.htmlLang, dir: language.dir, theme: meta.theme, mode: meta.mode, style: meta.style, scale };
+  const root = { lang: language.htmlLang, dir: language.dir, theme: meta.theme, mode: meta.mode, style: meta.style, scale, measure: meta.width };
   // The one inline script, as the browser reads it: the policy pins a hash of exactly this text.
   const script = `\n${RUNTIME_JS}${meta.template === 'canvas' ? CANVAS_JS : ''}${hasDelta(body) ? DELTA_JS : ''}${update ? UPDATE_JS : ''}${closeAfter ? CLOSE_AFTER_JS : ''}`;
   return `<!doctype html>
@@ -353,6 +353,7 @@ ${pageCss(embedded, { diff: body.includes('class="am-codeblock am-codeblock--dif
 <div class="am-toolbar"${rootCarrierAttrs(root)}>
 ${notice.button}${pick('theme', ui.theme, embedded.map((t) => [t.name, t.label[labelKey]]), meta.theme)}
 ${pick('mode', ui.modeLabel, Object.entries(ui.mode), meta.mode)}
+${pick('measure', ui.measureLabel, Object.entries(ui.measure), meta.width)}
 ${scaleButtons(ui)}
 <button class="am-btn am-btn--reply" type="button" data-am="reply" data-ui="${esc(JSON.stringify({ ...ui.reply, done: ui.done, remarks: ui.remark.section, kinds: ui.remark.kinds, words: ui.remark.words, ...(closeAfter ? { closeAfter: { seconds: CLOSE_AFTER_SECONDS, ...ui.closeAfter } } : {}) }))}">${esc(ui.reply.button)}</button>
 <button class="am-btn am-btn--remark" type="button" data-am="remark" data-ui="${esc(JSON.stringify(ui.remark))}">${esc(ui.remark.button)}</button>

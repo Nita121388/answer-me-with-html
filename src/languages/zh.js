@@ -15,6 +15,7 @@ export default {
     },
     theme: '主题', modeLabel: '明暗',
     mode: { auto: '跟随系统', light: '亮', dark: '暗' },
+    measureLabel: '宽度', measure: { standard: '标准', wide: '宽', full: '满宽' },
     scale: { down: '缩小文字', up: '放大文字' },
     move: '移动面板', resetOrder: '恢复原始顺序',
     canvas: { zoomIn: '放大', zoomOut: '缩小', fit: '适配', reset: '复位', linkFrom: '从这里连出去', copyEdges: '复制连线', drawio: '导出 drawio' , fullscreen: '全屏', exitFullscreen: '退出全屏'},

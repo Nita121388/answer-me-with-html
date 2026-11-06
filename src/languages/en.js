@@ -13,6 +13,7 @@ export default {
     },
     theme: 'Theme', modeLabel: 'Mode',
     mode: { auto: 'Auto', light: 'Light', dark: 'Dark' },
+    measureLabel: 'Width', measure: { standard: 'Reading', wide: 'Wide', full: 'Full' },
     scale: { down: 'Smaller text', up: 'Larger text' },
     move: 'Move panel', resetOrder: 'Restore the original order',
     canvas: { zoomIn: 'Zoom in', zoomOut: 'Zoom out', fit: 'Fit', reset: 'Reset', linkFrom: 'Link from this panel', copyEdges: 'Copy edges', drawio: 'Export .drawio' , fullscreen: 'Full screen', exitFullscreen: 'Exit full screen'},

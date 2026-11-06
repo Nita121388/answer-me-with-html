@@ -26,6 +26,7 @@ export const CONFIG_KEYS = Object.freeze({
   template: { type: 'enum', choices: ['sheet', 'doc'], default: 'sheet', label: 'Layout a draft gets when it does not say (sheet: panels in rows; doc: one column with an outline rail)' },
   cols: { type: 'number', min: 1, max: 6, step: 1, default: 3, label: 'Columns in a sheet page when the draft does not say (1 = a single column)' },
   collapse: { type: 'bool', default: false, label: 'Make every panel foldable unless the draft says otherwise (a panel opts out with {collapse=false}, and a sub-panel follows its page)' },
+  width: { type: 'enum', choices: ['standard', 'wide', 'full'], default: 'standard', label: 'Reading width when the draft does not say: standard (the reading measure), wide, or full (the window)' },
   voice: { type: 'enum', choices: VOICES, default: 'auto', label: 'Video narration voice-over (auto: ElevenLabs if ELEVENLABS_API_KEY is set, otherwise system TTS; local: the local service at AM_TTS_URL)' },
 });
 
