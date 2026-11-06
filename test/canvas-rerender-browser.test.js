@@ -57,7 +57,7 @@ const evaluate = async (expression) => {
 const mouse = (type, x, y) => page('Input.dispatchMouseEvent', { type, x, y, button: 'left', clickCount: 1 });
 const render = (source) => {
   writeFileSync(draftPath, source);
-  execFileSync(process.execPath, [join(ROOT, 'bin/am.js'), 'render', draftPath, '-o', boardFile, '--no-open'], { stdio: 'ignore' });
+  execFileSync(process.execPath, [join(ROOT, 'bin/am.js'), 'render', draftPath, '-o', boardFile, '--no-open'], { stdio: 'ignore', env: { ...process.env, AM_HOME: join(tmp, 'home'), AM_NO_UPDATE_CHECK: '1' } });
 };
 const open = async () => {
   const loaded = cdp.once('Page.loadEventFired');

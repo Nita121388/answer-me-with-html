@@ -36,7 +36,7 @@ export default {
     },
     closeAfter: { closing: 'הלשונית תיסגר בעוד {n} שניות', keep: 'להשאיר פתוחה', closeFailed: 'התגובה הועתקה. אפשר לסגור את הלשונית.' },
     toc: 'תוכן העניינים', flow: 'תרשים זרימה', sequence: 'תרשים רצף', er: 'תרשים ישויות וקשרים', colon: ': ', sep: ', ',
-    expand: 'הגדלת התרשים', close: 'סגירה', diagram: 'מציג התרשים',
+    expand: 'הגדלת התרשים', close: 'סגירה', diagram: 'מציג התרשים', expandImage: 'הגדלת תמונה', image: 'מציג תמונה',
     delta: { added: 'נוסף', removed: 'הוסר', changed: 'שונה', view: 'תצוגה', before: 'לפני', changes: 'שינויים', after: 'אחרי' },
     generated: 'נוצר באמצעות', limits: { value: '{value} מתוך {limit}', limit: 'עד {limit}' },
     chart: { name: 'תרשים', data: 'נתונים', value: 'ערך', share: 'חלק' },

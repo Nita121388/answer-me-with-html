@@ -76,7 +76,7 @@ before(async () => {
     const draft = join(tmp, `${name}.md`);
     const out = join(tmp, `${name}.html`);
     writeFileSync(draft, src);
-    execFileSync(process.execPath, [join(ROOT, 'bin/am.js'), 'render', draft, '-o', out, '--no-open'], { stdio: 'ignore' });
+    execFileSync(process.execPath, [join(ROOT, 'bin/am.js'), 'render', draft, '-o', out, '--no-open'], { stdio: 'ignore', env: { ...process.env, AM_HOME: join(tmp, 'home'), AM_NO_UPDATE_CHECK: '1' } });
     files[name] = out;
   };
   render(DRAFT, 'drag');

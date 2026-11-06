@@ -121,7 +121,9 @@ const IMAGE_HELP = `Images: a screenshot, photo or render that already exists as
 - PNG, JPG, GIF, WebP, AVIF and SVG files up to 5 MB. The file is embedded in the page, which stays one file that opens offline.
 - Remote images do not load: the page blocks every remote request, so an http(s) or // URL shows nothing and the render warns about it. Save the image and use its local path. data: URIs work.
 - The page keeps the path of each image. am patch embeds the image again from the file, or from the page when the file is gone.
-- Images are for things a diagram cannot show, such as a real screen. Do not generate or invent images.`;
+- Images are for things a diagram cannot show, such as a real screen. Do not generate or invent images.
+- A reader clicks a picture to enlarge it: it opens in the same viewer as a diagram, with zoom, pan and Escape to close. The
+  caption becomes the viewer's title. A picture wrapped in a link keeps the link instead.`;
 
 const CODE_HELP = `Code blocks: real code from a file, or code you type
 

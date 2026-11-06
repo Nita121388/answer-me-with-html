@@ -122,7 +122,7 @@ before(async () => {
   const draft = join(tmp, 'draft.md');
   boardFile = join(tmp, 'board.html');
   writeFileSync(draft, DRAFT);
-  execFileSync(process.execPath, [join(ROOT, 'bin/am.js'), 'render', draft, '-o', boardFile, '--no-open'], { stdio: 'ignore' });
+  execFileSync(process.execPath, [join(ROOT, 'bin/am.js'), 'render', draft, '-o', boardFile, '--no-open'], { stdio: 'ignore', env: { ...process.env, AM_HOME: join(tmp, 'home'), AM_NO_UPDATE_CHECK: '1' } });
 
   chrome = spawn(CHROME, [
     '--headless=new', '--remote-debugging-port=0', `--user-data-dir=${join(tmp, 'profile')}`,

@@ -295,9 +295,11 @@ export const hasDelta = (html) => html.includes('class="am-delta-bar"');
 // A chart (src/components/chart.js) needs its own styles, as a formula needs the math ones.
 export const hasChart = (html) => html.includes('class="am-diagram am-chart"');
 
-function lightboxShell(ui, hasDiagrams) {
-  if (!hasDiagrams) return '';
-  return `<div class="am-lightbox" hidden aria-modal="true" role="dialog" aria-label="${esc(ui.diagram)}" data-expand="${esc(ui.expand)}">
+// The viewer serves diagrams and images alike: a diagram is cloned as its <svg>, an image as its <img>, and the same pan, zoom,
+// keyboard and close behaviour covers both. The two labels travel with the shell so the dialog can name what it holds.
+function lightboxShell(ui, hasDiagrams, hasImages) {
+  if (!hasDiagrams && !hasImages) return '';
+  return `<div class="am-lightbox" hidden aria-modal="true" role="dialog" aria-label="${esc(ui.diagram)}" data-expand="${esc(ui.expand)}" data-expand-image="${esc(ui.expandImage ?? ui.expand)}" data-viewer-image="${esc(ui.image ?? ui.diagram)}" data-viewer-diagram="${esc(ui.diagram)}">
 <div class="am-lightbox-backdrop"></div>
 <div class="am-lightbox-header">
 <div class="am-lightbox-title">
@@ -358,7 +360,7 @@ ${meta.drag === true ? `<button class="am-btn" type="button" data-am="reset-orde
 <button class="am-btn" type="button" data-am="copy" data-done="${esc(ui.done)}">${esc(ui.copy)}</button>
 </div>
 ${notice.popover}${withColophon(body, language)}
-${lightboxShell(ui, body.includes('class="am-diagram'))}${sourceTag(source)}
+${lightboxShell(ui, body.includes('class="am-diagram'), body.includes('class="am-figure'))}${sourceTag(source)}
 <script>${script}</script>
 </body>
 </html>

@@ -153,9 +153,11 @@
   }
 
   // ── Diagram Lightbox & Pan-Zoom Viewer ─────────────
-  const diagrams = document.querySelectorAll('.am-diagram:not(.am-lightbox-canvas)');
+  const diagrams = [...document.querySelectorAll('.am-diagram:not(.am-lightbox-canvas)')];
+  // A picture the reader can enlarge: a figure's image, unless a link already owns that click.
+  const pictures = [...document.querySelectorAll('.am-figure img')].filter((img) => !img.closest('a'));
   const lb = document.querySelector('.am-lightbox');
-  if (diagrams.length && lb) {
+  if ((diagrams.length || pictures.length) && lb) {
     const backdrop = lb.querySelector('.am-lightbox-backdrop');
     const titleText = lb.querySelector('.am-lightbox-title-text');
     const stage = lb.querySelector('.am-lightbox-stage');
@@ -227,9 +229,14 @@
       clone.style.height = `${curVh}px`;
       canvas.innerHTML = '';
       canvas.append(clone);
+      lb.setAttribute('aria-label', lb.getAttribute('data-viewer-diagram') || lb.getAttribute('aria-label') || '');
+      reveal();
+    };
+
+    // Show the cloned thing centred and fitted to the stage, whatever it is: the tail both the diagram and the picture take.
+    const reveal = () => {
       lb.removeAttribute('hidden');
       document.body.style.overflow = 'hidden';
-
       const rect = stage.getBoundingClientRect();
       const pad = 48;
       const availW = Math.max(100, rect.width - pad * 2);
@@ -242,10 +249,28 @@
       closeBtn.focus();
     };
 
+    // A picture opens at its own pixel size, so a screenshot of a UI can be read at 1:1 when the reader zooms in.
+    const openPicture = (img, trigger) => {
+      lastTrigger = trigger;
+      curVw = img.naturalWidth || img.width || img.clientWidth || 800;
+      curVh = img.naturalHeight || img.height || img.clientHeight || 600;
+      const caption = img.closest('figure')?.querySelector('figcaption')?.textContent?.trim() || img.alt || '';
+      if (titleText) titleText.textContent = caption;
+      lb.setAttribute('aria-label', lb.getAttribute('data-viewer-image') || '');
+      const clone = img.cloneNode(true);
+      for (const attr of ['tabindex', 'role', 'aria-label']) clone.removeAttribute(attr);
+      clone.style.width = `${curVw}px`;
+      clone.style.height = `${curVh}px`;
+      canvas.innerHTML = '';
+      canvas.append(clone);
+      reveal();
+    };
+
     const close = () => {
       if (lb.hasAttribute('hidden')) return;
       lb.setAttribute('hidden', '');
       canvas.innerHTML = '';
+      lb.setAttribute('aria-label', lb.getAttribute('data-viewer-diagram') || '');
       document.body.style.overflow = '';
       lastTrigger?.focus();
     };
@@ -317,6 +342,20 @@
     });
 
     const expandSvg = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline><line x1="21" y1="3" x2="14" y2="10"></line><line x1="3" y1="21" x2="10" y2="14"></line></svg>';
+    const imageLabel = lb.getAttribute('data-expand-image') || expandLabel;
+    pictures.forEach((img) => {
+      img.tabIndex = 0;
+      img.setAttribute('role', 'button');
+      img.setAttribute('aria-label', imageLabel);
+      img.title = imageLabel;
+      img.addEventListener('click', () => openPicture(img, img));
+      img.addEventListener('keydown', (e) => {
+        if (e.key !== 'Enter' && e.key !== ' ') return;
+        e.preventDefault();
+        openPicture(img, img);
+      });
+    });
+
     diagrams.forEach((diag) => {
       const btn = document.createElement('button');
       btn.type = 'button';
