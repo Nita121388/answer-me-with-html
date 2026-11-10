@@ -78,6 +78,16 @@ const reload = async () => {
   await loaded;
 };
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+// Render a draft into its own file and open it. The shared page (page.html) is what reload() reloads.
+const renderPage = (name, source) => {
+  const draft = join(tmp, `${name}.md`);
+  const file = join(tmp, `${name}.html`);
+  writeFileSync(draft, source);
+  execFileSync(process.execPath, [join(ROOT, 'bin/am.js'), 'render', draft, '-o', file, '--no-open'], {
+    env: { ...process.env, AM_NO_UPDATE_CHECK: '1', AM_HOME: join(tmp, 'home') }, stdio: 'pipe',
+  });
+  return file;
+};
 
 before(async () => {
   if (SKIP) return;
@@ -154,6 +164,8 @@ const PAGE_JS = `
     selection.addRange(range);
   };
   const store = () => JSON.parse(localStorage.getItem('am-remark:' + location.pathname) || '[]');
+  const stored2 = store;
+  const at = (sel, text, n = 0) => [...document.querySelectorAll('main ' + sel)].filter((el) => el.textContent.includes(text))[n];
   const kinds = () => [...document.querySelectorAll('.am-annot-float .am-remark-kind')];
   const tag = (i) => kinds()[i].click();
   const note = (text) => {
@@ -315,5 +327,220 @@ test('Clear all drops the text marks with the block marks', { skip: SKIP }, asyn
   await sleep(200);
   assert.equal(await run('return marks().length;'), 0);
   assert.deepEqual(await run('return store();'), []);
+  assert.deepEqual(await errors(), []);
+});
+
+// The failures a reader hits while marking a second phrase, all found by clicking around rather than by the happy path above.
+// `pickRange` selects from one phrase to another, the way a reader drags across a mark; `stored2` is the saved record list.
+const REGRESSION_JS = `
+  const pickRange = (from, fromOffset, to, toOffset) => {
+    const a = nodeWith(panel('A'), from);
+    const b = nodeWith(panel('A'), to);
+    if (!a || !b) return false;
+    const r = document.createRange();
+    r.setStart(a, fromOffset === undefined ? a.data.indexOf(from) : fromOffset);
+    r.setEnd(b, toOffset === undefined ? b.data.indexOf(to) + to.length : toOffset);
+    const s = getSelection(); s.removeAllRanges(); s.addRange(r);
+    return true;
+  };
+`;
+
+test('a reopened mark is edited, but a different selection starts its own mark instead of replacing it', { skip: SKIP }, async () => {
+  const p = PAGES.en;
+  await reset();
+  await run(`pick(${JSON.stringify(p.words)});`); await sleep(300); await run('tag(0);'); await sleep(200);
+  await run(`pick(${JSON.stringify(p.later)});`); await sleep(300); await run('tag(1);'); await sleep(200);
+  assert.deepEqual(await run(`return stored2().map((m) => [m.quote, m.kind]);`), [[p.words, 'suggestion'], [p.later, 'keep']]);
+  // Click the first mark: the float opens on it, with its note and its Remove button.
+  await run('marks()[0].click();'); await sleep(300);
+  assert.deepEqual(await run(`return {shown: shown(float), value: float.querySelector('input').value, drop: !float.querySelector('.am-btn').hidden};`), { shown: true, value: '', drop: true });
+  // Now select other words in the same block. The float belongs to those words: it carries no Remove button and no note.
+  await run(`pick('Same text two');`); await sleep(350);
+  assert.deepEqual(await run(`return {shown: shown(float), value: float.querySelector('input').value, drop: !float.querySelector('.am-btn').hidden};`), { shown: true, value: '', drop: false });
+  await run('tag(2);'); await sleep(250);
+  // Three marks: tagging the second phrase did not delete the first.
+  assert.deepEqual(await run(`return stored2().map((m) => [m.quote, m.kind]);`), [[p.words, 'suggestion'], [p.later, 'keep'], ['Same text two', 'question']]);
+  assert.deepEqual(await errors(), []);
+});
+
+test('Enter in the note box of an existing mark keeps the kind it already had', { skip: SKIP }, async () => {
+  const p = PAGES.en;
+  await reset();
+  await run(`pick(${JSON.stringify(p.words)});`); await sleep(300); await run('tag(1);'); await sleep(200);
+  await run('marks()[0].click();'); await sleep(300);
+  await run('note("a late thought");'); await sleep(250);
+  assert.deepEqual(await run(`return stored2().map((m) => [m.kind, m.note]);`), [['keep', 'a late thought']]);
+  assert.deepEqual(await errors(), []);
+});
+
+test('a mark keeps its record after the page text moved, so a click on it still opens it and Remove still drops it', { skip: SKIP }, async () => {
+  const p = PAGES.en;
+  // The block's key is the start of its text (80 characters), so a paragraph that opens with more than that keeps its key while
+  // an insertion further on moves every offset after it.
+  const HEAD = 'Opening line that is long enough to fill more than eighty characters, so the block fingerprint stays the same here.';
+  const page = (mid = '') => `---
+title: Text mark check
+lang: en
+---
+## A The cache
+${HEAD} ${mid}${p.first}
+
+## B Release
+It ${p.other}.
+`;
+  const draft = join(tmp, 'page.md');
+  const file = join(tmp, 'page.html');
+  const renderIt = () => {
+    writeFileSync(draft, page());
+    execFileSync(process.execPath, [join(ROOT, 'bin/am.js'), 'render', draft, '-o', file, '--no-open'], {
+      env: { ...process.env, AM_NO_UPDATE_CHECK: '1', AM_HOME: join(tmp, 'home') }, stdio: 'pipe',
+    });
+  };
+  renderIt();
+  await load(pathToFileURL(file).href);
+  await evaluate(`localStorage.clear()`);
+  renderIt();
+  await reload();
+  await mode(true);
+  await run(`pick(${JSON.stringify(p.words)});`); await sleep(300); await run('tag(3);'); await sleep(200);
+  const before = await run(`return stored2()[0];`);
+  assert.equal(before.kind, 'concern');
+  // Rewrite the page with a sentence inserted after the key but before the mark: the key stays, every offset after it moves.
+  writeFileSync(draft, page('A brand new inserted sentence.'));
+  execFileSync(process.execPath, [join(ROOT, 'bin/am.js'), 'render', draft, '-o', file, '--no-open'], {
+    env: { ...process.env, AM_NO_UPDATE_CHECK: '1', AM_HOME: join(tmp, 'home') }, stdio: 'pipe',
+  });
+  await load(pathToFileURL(file).href);
+  await mode(true);
+  // The painted part carries the record's own id, so the click finds the record and the float opens on it.
+  await run('marks()[0].click();'); await sleep(350);
+  assert.deepEqual(await run(`return {shown: shown(float), drop: !float.querySelector('.am-btn').hidden};`), { shown: true, drop: true });
+  await run('float.querySelector(".am-btn").click();'); await sleep(300);
+  assert.deepEqual(await run(`return {marks: marks().length, store: stored2().length};`), { marks: 0, store: 0 });
+  assert.deepEqual(await errors(), []);
+});
+
+test('two marks that overlap never nest, and each one can still be clicked and removed', { skip: SKIP }, async () => {
+  const p = PAGES.en;
+  await reset();
+  await run(`pick(${JSON.stringify(p.words)});`); await sleep(300); await run('tag(0);'); await sleep(200);
+  await run(`pick(${JSON.stringify(p.later)});`); await sleep(300); await run('tag(1);'); await sleep(200);
+  // A third range that covers the end of the first mark and the start of the second.
+  await run(`${REGRESSION_JS} pickRange(${JSON.stringify(p.words)}, 6, ${JSON.stringify(p.later)}, ${JSON.stringify(p.later)}.length);`); await sleep(350);
+  await run('tag(3);'); await sleep(300);
+  const state = await run(`return {
+    nested: document.querySelectorAll('mark.am-annot mark.am-annot').length,
+    numbers: [...document.querySelectorAll('sup.am-annot-n')].map((s) => s.textContent),
+    store: stored2().length,
+    parts: marks().length,
+  };`);
+  assert.equal(state.nested, 0, 'no mark sits inside another');
+  assert.deepEqual(state.numbers, ['1', '2', '3'], 'the numbers run down the page without a gap or a swap');
+  assert.equal(state.store, 3);
+  assert.ok(state.parts >= 3, 'every mark keeps a part of its own to click');
+  // The overlapping mark can be clicked and dropped, and the other two stay.
+  await run(`[...document.querySelectorAll('mark.am-annot')].find((m) => m.dataset.kind === 'concern').click();`); await sleep(350);
+  assert.equal(await run(`return !float.querySelector('.am-btn').hidden;`), true);
+  await run('float.querySelector(".am-btn").click();'); await sleep(300);
+  assert.deepEqual(await run(`return stored2().map((m) => m.kind);`), ['suggestion', 'keep']);
+  assert.deepEqual(await errors(), []);
+});
+
+test('a drag that picks words opens the float only, not the block popover as well', { skip: SKIP }, async () => {
+  const p = PAGES.en;
+  await reset();
+  // A real drag ends with a click on the block it started in.
+  const out = await run(`${REGRESSION_JS}
+    pick(${JSON.stringify(p.words)});
+    const el = at('p', ${JSON.stringify(p.first)});
+    el.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    return { pop: !document.querySelector('.am-remark-pop').hidden };`);
+  await sleep(400);
+  assert.equal(out.pop, false, 'the block popover stayed closed');
+  assert.equal(await run('return shown(float);'), true, 'the word float opened');
+  await run('tag(0);'); await sleep(250);
+  assert.deepEqual(await run(`return stored2().map((m) => [m.quote, m.kind]);`), [[p.words, 'suggestion']]);
+  assert.deepEqual(await errors(), []);
+});
+
+test('the reply preview drops one comment and one mark, and the copied text follows', { skip: SKIP }, async () => {
+  const p = PAGES.en;
+  const L = p.lang.ui;
+  await reset();
+  await run(`pick(${JSON.stringify(p.words)});`); await sleep(300); await run('tag(1);'); await sleep(200);
+  await run(`pick(${JSON.stringify(p.later)});`); await sleep(300); await run('tag(2);'); await sleep(200);
+  // One comment on panel A, so the preview has a comment entry and two remark entries.
+  await run(`panel('A').querySelector('.am-comment-btn').click();
+    const box = panel('A').querySelector('.am-comment textarea');
+    box.value = 'a note on the panel';
+    box.dispatchEvent(new Event('input', { bubbles: true }));`);
+  await evaluate(`document.querySelector('[data-am="reply"]').click()`);
+  await sleep(300);
+  const before = await run(`return {
+    refs: [...document.querySelectorAll('dialog.am-reply .am-rv-entry')].map((e) => e.dataset.ref),
+    raw: document.querySelector('dialog.am-reply textarea').value,
+  };`);
+  assert.deepEqual(before.refs, ['cA', 'r0', 'r1']);
+  // Drop the comment from the preview: the panel box empties and the drawn reply loses the line.
+  await run(`document.querySelector('dialog.am-reply .am-rv-entry[data-ref="cA"] .am-rv-clear').click();`); await sleep(300);
+  const noComment = await run(`return {
+    refs: [...document.querySelectorAll('dialog.am-reply .am-rv-entry')].map((e) => e.dataset.ref),
+    raw: document.querySelector('dialog.am-reply textarea').value,
+    box: panel('A').querySelector('.am-comment textarea').value,
+    open: document.querySelector('dialog.am-reply').open,
+  };`);
+  assert.deepEqual(noComment.refs, ['r0', 'r1']);
+  assert.equal(noComment.box, '');
+  assert.equal(noComment.open, true, 'the sheet stayed open');
+  assert.doesNotMatch(noComment.raw, new RegExp(L.reply.comments));
+  // Drop the first mark: it leaves the page and the reply.
+  await run(`document.querySelector('dialog.am-reply .am-rv-entry[data-ref="r0"] .am-rv-clear').click();`); await sleep(300);
+  const noMark = await run(`return {
+    refs: [...document.querySelectorAll('dialog.am-reply .am-rv-entry')].map((e) => e.dataset.ref),
+    raw: document.querySelector('dialog.am-reply textarea').value,
+    store: stored2().map((m) => m.quote),
+    marks: marks().length,
+  };`);
+  assert.deepEqual(noMark.refs, ['r0']);
+  assert.deepEqual(noMark.store, [p.later]);
+  assert.equal(noMark.marks, 1);
+  assert.doesNotMatch(noMark.raw, new RegExp(p.words));
+  assert.match(noMark.raw, new RegExp(p.later));
+  assert.deepEqual(await errors(), []);
+});
+
+test('a code block copies its code, not the number of a mark inside it', { skip: SKIP }, async () => {
+  const file = renderPage('code-copy', `---
+title: Code copy
+lang: en
+---
+## A Cache
+\`\`\`js
+const a = 1;
+const b = 2;
+\`\`\`
+`);
+  await load(file);
+  await mode(true);
+  const picked = await run(`
+    const node = nodeWith(panel('A'), 'const b = 2;');
+    if (!node) return 'no-code-node';
+    const i = node.data.indexOf('const b = 2;');
+    const r = document.createRange();
+    r.setStart(node, i);
+    r.setEnd(node, i + 'const b = 2;'.length);
+    const s = getSelection(); s.removeAllRanges(); s.addRange(r);
+    return true;`);
+  assert.equal(picked, true);
+  await sleep(300);
+  await run('tag(0);'); await sleep(250);
+  assert.equal(await run('return marks().length;'), 1);
+  // The copy button's own work (src/runtime/page.js) is the same on a page with a mark: the mark's number is not code.
+  const lines = await run(`return [...document.querySelectorAll('.am-ln')].map((line) => {
+    const copy = line.cloneNode(true);
+    for (const el of copy.querySelectorAll('.am-annot-n, .am-mark-note')) el.remove();
+    return copy.textContent;
+  });`);
+  assert.deepEqual(lines, ['const a = 1;', 'const b = 2;']);
   assert.deepEqual(await errors(), []);
 });

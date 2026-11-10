@@ -21,24 +21,36 @@ function inline(s) {
     .replace(/&quot;(.+)&quot;$/, (_, t) => `&quot;<bdi dir="${dirOf(t)}">${t}</bdi>&quot;`);
 }
 
+// One line of the reply as HTML. `ref` is the entry the line came from (a comment or a remark); the sheet puts a Clear button on
+// the line that has one. The markup of the line itself does not change, so a test can read both forms.
+export function replyLineHtml(line, ref = '') {
+  const dir = dirOf(line);
+  let m;
+  if (!line.trim()) return '<div class="am-rv-gap"></div>';
+  if ((m = line.match(/^(#{1,2}) (.*)$/))) return `<div class="am-rv-h${m[1].length}" dir="${dir}">${inline(m[2])}</div>`;
+  if ((m = line.match(/^(\d+)\. \[([^\]]*)\] (.*)$/))) {
+    return `<div class="am-rv-q" dir="${dir}"><bdi>${m[1]}.</bdi> <bdi class="am-rv-tag">${escHtml(m[2])}</bdi> ${inline(m[3])}</div>`;
+  }
+  if ((m = line.match(/^ {3}([←→]) (.*)$/))) return `<div class="am-rv-a" dir="${dir}">${m[1]} ${inline(m[2])}</div>`;
+  if ((m = line.match(/^- (.*)$/))) return `<div class="am-rv-c" dir="${dir}">${inline(m[1])}</div>`;
+  // A comment line is shown exactly as the reader typed it.
+  if ((m = line.match(/^ {2}> ?(.*)$/))) return `<div class="am-rv-quote" dir="${dirOf(m[1])}">${escHtml(m[1]) || '&nbsp;'}</div>`;
+  return `<div dir="${dir}">${inline(line)}</div>`;
+}
+
 // The reply text (src/runtime/reply-text.js) as HTML, one block per line.
 export function replyViewHtml(text) {
   return text
     .replace(/\n$/, '')
     .split('\n')
-    .map((line) => {
-      const dir = dirOf(line);
-      let m;
-      if (!line.trim()) return '<div class="am-rv-gap"></div>';
-      if ((m = line.match(/^(#{1,2}) (.*)$/))) return `<div class="am-rv-h${m[1].length}" dir="${dir}">${inline(m[2])}</div>`;
-      if ((m = line.match(/^(\d+)\. \[([^\]]*)\] (.*)$/))) {
-        return `<div class="am-rv-q" dir="${dir}"><bdi>${m[1]}.</bdi> <bdi class="am-rv-tag">${escHtml(m[2])}</bdi> ${inline(m[3])}</div>`;
-      }
-      if ((m = line.match(/^ {3}([←→]) (.*)$/))) return `<div class="am-rv-a" dir="${dir}">${m[1]} ${inline(m[2])}</div>`;
-      if ((m = line.match(/^- (.*)$/))) return `<div class="am-rv-c" dir="${dir}">${inline(m[1])}</div>`;
-      // A comment line is shown exactly as the reader typed it.
-      if ((m = line.match(/^ {2}> ?(.*)$/))) return `<div class="am-rv-quote" dir="${dirOf(m[1])}">${escHtml(m[1]) || '&nbsp;'}</div>`;
-      return `<div dir="${dir}">${inline(line)}</div>`;
-    })
+    .map((line) => replyLineHtml(line))
+    .join('');
+}
+
+// The reply as lines (replyLines in src/runtime/reply-text.js) drawn in the sheet. A line that names a comment or a mark is wrapped
+// with a Clear button, so the reader can drop that one entry from the preview; `label` is the button's accessible name.
+export function replyLinesHtml(lines, label) {
+  return lines
+    .map(({ text, ref }) => (ref ? `<div class="am-rv-entry" data-ref="${escHtml(ref)}">${replyLineHtml(text)}<button type="button" class="am-rv-clear" title="${escHtml(label)}" aria-label="${escHtml(label)}">✕</button></div>` : replyLineHtml(text)))
     .join('');
 }

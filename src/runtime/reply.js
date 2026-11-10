@@ -161,12 +161,33 @@ if (replyBtn) {
       suggested: [...ask.querySelectorAll('input[data-suggested]')].map((i) => i.value),
       touched: touched.has(ask),
     }));
-    const comments = [...boxes].map(([id, box]) => ({ panel: id, title: panelOf(box).title, text: box.value }));
+    const comments = [...boxes].map(([id, box]) => ({ panel: id, id, title: panelOf(box).title, text: box.value }));
     const remarks = window.__amRemarkData?.() ?? [];
     const empty = !decisions.length && !comments.some((c) => c.text.trim()) && !remarks.length;
     const title = textOf(document.querySelector('.am-head h1')) ?? document.title;
-    return empty ? '' : replyText({ title, decisions, comments, remarks, ui, rtl: document.documentElement.dir === 'rtl' });
+    return empty ? '' : replyLines({ title, decisions, comments, remarks, ui, rtl: document.documentElement.dir === 'rtl' });
   };
+  const composeText = () => replyLinesText(compose());
+
+  // A Clear button in the preview drops one entry: a comment empties its panel box, a mark drops that one mark through
+  // remark.js. Both then rebuild the reply, so the drawn sheet and the copied text stay the same text.
+  view.addEventListener('click', (e) => {
+    const clear = e.target.closest?.('.am-rv-clear');
+    if (!clear) return;
+    const ref = clear.closest('.am-rv-entry')?.dataset.ref ?? '';
+    if (ref.startsWith('c')) {
+      const box = boxes.get(ref.slice(1));
+      if (box) {
+        box.value = '';
+        box.dispatchEvent(new Event('input', { bubbles: true }));
+        const owner = box.closest('.am-panel')?.querySelector('.am-comment-btn');
+        owner?.classList.remove('am-comment-btn--on');
+      }
+    } else if (ref.startsWith('r')) {
+      window.__amRemarkDrop?.(Number(ref.slice(1)));
+    }
+    render(false);
+  });
 
   // The text goes through the clipboard API; a page the browser treats as insecure (file://) falls back to selecting a temporary
   // textarea, because the sheet's own textarea can sit inside a closed fold, where it cannot be selected.
@@ -205,18 +226,28 @@ if (replyBtn) {
     setTimeout(() => { btn.textContent = ui.copy; }, 1400);
   };
 
-  const open = () => {
-    const reply = compose();
-    if (reply) view.innerHTML = replyViewHtml(reply);
+  // Draw the sheet from the current state. `open` also shows it; a Clear button in the preview calls just this, so dropping one
+  // entry redraws the sheet where the reader already is. A modal dialog that is already open throws on a second showModal.
+  const render = (fresh = false) => {
+    const lines = compose();
+    const scrolled = view.scrollTop;
+    if (lines) view.innerHTML = replyLinesHtml(lines, ui.clearEntry);
     else view.textContent = ui.empty;
-    view.scrollTop = 0;
+    // A sheet the reader just opened starts at the top; a sheet a Clear button redrew stays where they were reading.
+    view.scrollTop = fresh ? 0 : scrolled;
+    const reply = replyLinesText(lines);
     text.value = reply;
-    raw.open = false;
     raw.hidden = !reply;
     copy.disabled = !reply;
-    if (sheet.showModal) sheet.showModal();
-    else sheet.setAttribute('open', '');
-    (reply ? copy : close).focus();
+    if (fresh) (reply ? copy : close).focus();
+  };
+  const open = () => {
+    render(true);
+    raw.open = false;
+    if (!sheet.open) {
+      if (sheet.showModal) sheet.showModal();
+      else sheet.setAttribute('open', '');
+    }
   };
   replyBtn.addEventListener('click', open);
   close.addEventListener('click', () => (sheet.close ? sheet.close() : sheet.removeAttribute('open')));
@@ -232,7 +263,7 @@ if (replyBtn) {
   const preview = Object.assign(document.createElement('button'), { type: 'button', className: 'am-btn', textContent: ui.preview });
   const barCopy = Object.assign(document.createElement('button'), { type: 'button', className: 'am-btn am-btn--reply', textContent: ui.copy });
   preview.addEventListener('click', open);
-  barCopy.addEventListener('click', () => copyText(compose(), barCopy));
+  barCopy.addEventListener('click', () => copyText(composeText(), barCopy));
   bar.append(summary, preview, barCopy);
   document.body.append(bar);
 

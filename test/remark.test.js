@@ -90,7 +90,12 @@ test('a rendered page carries the remark button, and the labels the runtime read
 test('the page script sends remarks through replyText and has no second string join', () => {
   assert.match(RUNTIME_JS, /window\.__amRemarkData/);
   assert.doesNotMatch(RUNTIME_JS, /__amRemarkText/);
-  assert.match(RUNTIME_JS, /replyText\(\{ title, decisions, comments, remarks,/);
+  assert.match(RUNTIME_JS, /replyLines\(\{ title, decisions, comments, remarks,/);
+  // replyLinesText is the one join of those lines, so the copied text and the drawn sheet cannot drift apart.
+  assert.match(RUNTIME_JS, /function replyLinesText\(lines\) \{/);
+  assert.match(RUNTIME_JS, /const composeText = \(\) => replyLinesText\(compose\(\)\);/);
+  // The reply's own lines are joined once, in replyLinesText; nothing else in the page builds the reply text.
+  assert.equal((RUNTIME_JS.match(/line\) => line\.text\)/g) ?? []).length, 1, 'the reply lines are joined in one place');
 });
 
 test('every language file labels the remark button, the popover, clear action and the four kinds', () => {
@@ -105,4 +110,42 @@ test('a video has no remark mode, as it has no Reply; a page made after am patch
   assert.doesNotMatch(video.html, /data-am="remark"|__amRemarkData/);
   const patched = renderDoc(replacePanel('---\ntitle: T\nlang: en\n---\n## A One\nOld.\n', 'A One', '## A One\nNew.\n')).html;
   assert.match(patched, /data-am="remark"/);
+});
+
+// The runtime pieces the browser tests cannot pin cheaply: a mark's painted parts must carry the record's own id (a click finds it
+// again after the page changed), and the text mark painting must not nest one <mark> in another.
+test('remark: painted text marks carry the record id, and the painter cuts overlaps instead of nesting', () => {
+  // The id a mark is stored under is its key and its offsets, and the painter must not invent one from relocated offsets.
+  assert.match(RUNTIME_JS, /const id = annotId\(annot\);/);
+  assert.doesNotMatch(RUNTIME_JS, /const id = annotId\(\{ \.\.\.annot, start: place\[0\], end: place\[1\] \}\)/);
+  // The overlap rule is worked out before the DOM changes, and the parts are wrapped from the end of each node backwards.
+  assert.match(RUNTIME_JS, /const pieces = subtract\(place\[0\], place\[1\], taken\);/);
+  assert.match(RUNTIME_JS, /group\.sort\(\(a, b\) => b\.from - a\.from\);/);
+  // A part that cannot be wrapped is skipped, not thrown: one bad part must not lose the whole mark.
+  assert.match(RUNTIME_JS, /try \{\s*range\.surroundContents\(mark\);\s*job\.el = mark;\s*\} catch \{/);
+  // The numbers are written once, over the marks the page really shows, so they read 1, 2, 3 without a gap.
+  assert.match(RUNTIME_JS, /\[\.\.\.document\.querySelectorAll\('sup\.am-annot-n'\)\]\.forEach\(\(sup, i\) => \{ sup\.textContent = String\(i \+ 1\); \}\);/);
+});
+
+test('remark: a click that ends a drag picks words, not the block', () => {
+  // The block popover must not open under the word float: the click a drag ends with belongs to the drag.
+  assert.match(RUNTIME_JS, /const dragPicked = \(target\) => \{/);
+  assert.match(RUNTIME_JS, /if \(dragPicked\(e\.target\)\) return;/);
+  assert.match(RUNTIME_JS, /document\[toggle\]\('selectionchange', markSelection\);/);
+});
+
+test('remark: adding a note keeps the kind a mark already had, and the mark under a selection is found by where it sits', () => {
+  // Enter in the note box saves without naming a kind: the record keeps the one it has.
+  assert.match(RUNTIME_JS, /kind: kind \|\| editing\?\.kind \|\| '',/);
+  // The mark a selection edits is the one that covers exactly those words now, so a mark that moved is still found and a selection
+  // on other words matches nothing (and starts a mark of its own) instead of replacing the mark the reader had clicked.
+  assert.match(RUNTIME_JS, /editing = recordAt\(el, picked\.start, picked\.end\);/);
+  assert.doesNotMatch(RUNTIME_JS, /reopened/, 'no stale reopened record can outlive the selection that named it');
+});
+
+test('remark: the reply sheet can drop one mark, and a code block copies its code without the mark numbers', () => {
+  assert.match(RUNTIME_JS, /window\.__amRemarkDrop = \(index\) => \{/);
+  assert.match(RUNTIME_JS, /__amRemarkDrop\?\.\(Number\(ref\.slice\(1\)\)\);/);
+  // The copy of a code block takes out the mark furniture first.
+  assert.match(RUNTIME_JS, /copy\.querySelectorAll\('\.am-annot-n, \.am-mark-note'\)/);
 });

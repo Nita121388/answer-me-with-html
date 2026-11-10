@@ -252,3 +252,93 @@ test('fold: folding the panel the reader is looking at keeps its head under the 
   // A head the reader can see stays where it is, the way a <details> folds anywhere else on the web.
   assert.ok(Math.abs(after.top - before.top) <= 2, `the head moved ${(after.top - before.top).toFixed(1)}px`);
 });
+
+// Printing must not become the reader's choice: the panels open for paper and come back closed, and the stored folds still say
+// "closed" while the print layout shows them open.
+test('fold: printing leaves the stored folds exactly as the reader left them', { skip: SKIP, timeout: 60000 }, async () => {
+  await open(files.fold);
+  await evaluate(`localStorage.removeItem('am-fold:' + location.pathname)`);
+  await open(files.fold);
+  await evaluate(`document.querySelector('#panel-A > .am-fold > summary').click()`);
+  await new Promise((r) => setTimeout(r, LAYOUT_WAIT_MS));
+  const closed = JSON.parse(await evaluate(`localStorage.getItem('am-fold:' + location.pathname)`));
+  assert.deepEqual(closed, { 'panel-A': false }, 'A is stored closed');
+  await page('Emulation.setEmulatedMedia', { media: 'print' });
+  await new Promise((r) => setTimeout(r, 400));
+  assert.equal(await evaluate(`document.querySelector('#panel-A .am-fold').open`), true, 'A prints open');
+  assert.deepEqual(JSON.parse(await evaluate(`localStorage.getItem('am-fold:' + location.pathname)`)), closed, 'printing stored nothing');
+  await page('Emulation.setEmulatedMedia', { media: '' });
+  await new Promise((r) => setTimeout(r, 500));
+  assert.equal(await evaluate(`document.querySelector('#panel-A .am-fold').open`), false, 'A is closed again');
+  assert.deepEqual(JSON.parse(await evaluate(`localStorage.getItem('am-fold:' + location.pathname)`)), closed, 'still the reader choice');
+  await evaluate(`localStorage.removeItem('am-fold:' + location.pathname)`);
+});
+
+// One toolbar button folds every panel, then opens every panel, and the choice is the reader's: it survives a reload.
+test('fold: one button folds every panel and opens every panel, and the choice is remembered', { skip: SKIP, timeout: 60000 }, async () => {
+  await open(files.fold);
+  await evaluate(`localStorage.removeItem('am-fold:' + location.pathname)`);
+  await open(files.fold);
+  const initial = JSON.parse(await evaluate(`JSON.stringify({
+    open: [...document.querySelectorAll('.am-fold')].map((f) => f.open),
+    hidden: document.querySelector('[data-am="fold-all"]').hidden,
+    label: document.querySelector('[data-am="fold-all"]').textContent,
+  })`));
+  // A page without a foldable panel has no button; this page has one, labelled by what the click will do.
+  assert.equal(initial.hidden, false);
+  assert.equal(initial.label, 'Fold all');
+  assert.deepEqual(initial.open, [true, false, true], 'B starts folded from the draft, A and C open');
+
+  await evaluate(`document.querySelector('[data-am="fold-all"]').click()`);
+  await new Promise((r) => setTimeout(r, LAYOUT_WAIT_MS));
+  const folded = JSON.parse(await evaluate(`JSON.stringify({
+    open: [...document.querySelectorAll('.am-fold')].map((f) => f.open),
+    label: document.querySelector('[data-am="fold-all"]').textContent,
+    stored: JSON.parse(localStorage.getItem('am-fold:' + location.pathname)),
+  })`));
+  assert.deepEqual(folded.open, [false, false, false], 'every panel is folded');
+  assert.equal(folded.label, 'Open all', 'the button now offers the other direction');
+  assert.deepEqual(folded.stored, { 'panel-A': false, 'panel-B': false, 'panel-C': false }, 'the choice is stored for every panel');
+
+  await evaluate(`document.querySelector('[data-am="fold-all"]').click()`);
+  await new Promise((r) => setTimeout(r, LAYOUT_WAIT_MS));
+  assert.deepEqual(JSON.parse(await evaluate(`JSON.stringify([...document.querySelectorAll('.am-fold')].map((f) => f.open))`)), [true, true, true]);
+  assert.equal(await evaluate(`document.querySelector('[data-am="fold-all"]').textContent`), 'Fold all');
+
+  // Folding all again, then reloading: the page comes back folded.
+  await evaluate(`document.querySelector('[data-am="fold-all"]').click()`);
+  await new Promise((r) => setTimeout(r, LAYOUT_WAIT_MS));
+  await open(files.fold);
+  assert.deepEqual(JSON.parse(await evaluate(`JSON.stringify([...document.querySelectorAll('.am-fold')].map((f) => f.open))`)), [false, false, false]);
+  assert.equal(await evaluate(`document.querySelector('[data-am="fold-all"]').textContent`), 'Open all');
+  await evaluate(`localStorage.removeItem('am-fold:' + location.pathname)`);
+});
+
+// A deep scroll plus one click: every panel folds at once, and the reader is left at a real place on the page, not at a scroll
+// position past the end. On a page whose folded form still scrolls the anchor panel holds its place (see anchorOf in fold.js);
+// when the folded page fits the window the only place left is the top.
+test('fold: folding every panel leaves the reader at a real place on the page', { skip: SKIP, timeout: 60000 }, async () => {
+  await open(files.long);
+  await evaluate('window.scrollTo(0, 900)');
+  await new Promise((r) => setTimeout(r, 300));
+  await evaluate(`document.querySelector('[data-am="fold-all"]').click()`);
+  await new Promise((r) => setTimeout(r, 500));
+  const after = JSON.parse(await evaluate(`JSON.stringify({
+    open: [...document.querySelectorAll('.am-fold')].map((f) => f.open),
+    scrollY,
+    innerHeight,
+    maxScroll: Math.max(0, document.documentElement.scrollHeight - innerHeight),
+    firstHead: document.querySelector('.am-panel summary')?.getBoundingClientRect().top ?? null,
+  })`));
+  assert.ok(after.open.every((open) => open === false), 'every panel is folded');
+  assert.ok(after.scrollY <= after.maxScroll + 1, `scrolled ${after.scrollY} into a page ${after.maxScroll} tall`);
+  assert.ok(after.scrollY >= 0, 'the page is not scrolled above its top');
+  // The reader is looking at panels, not at empty space: the first head is on the screen.
+  assert.ok(after.firstHead !== null && after.firstHead >= -1, 'the first folded head is at or below the top of the window');
+  await evaluate(`localStorage.removeItem('am-fold:' + location.pathname)`);
+});
+
+test('fold: a page with no foldable panel carries no fold-all button', { skip: SKIP, timeout: 60000 }, async () => {
+  await open(files.plain);
+  assert.equal(await evaluate(`document.querySelector('[data-am="fold-all"]').hidden`), true);
+});

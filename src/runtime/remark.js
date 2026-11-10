@@ -276,58 +276,130 @@
     return [from, to];
   };
 
-  // Paint one text mark: wrap each part of the range in a <mark>, tag the formula it covers, and number the last part. It answers
-  // false when the block no longer holds the words, so the caller can leave the mark stored and unshown.
-  const paintAnnot = (el, annot, n) => {
-    const { index, lead, text } = annotIndex(el);
-    const place = relocate(text, annot);
-    if (!place) return false;
-    const parts = sliceAt(index, place[0], place[1]);
-    if (!parts.length) return false;
-    const id = annotId({ ...annot, start: place[0], end: place[1] });
-    const tagged = [];
-    for (const part of parts) {
-      const node = part.id;
-      const math = formulaOf(node);
-      if (math) {
-        if (!math.classList.contains('am-annot')) {
-          math.classList.add('am-annot');
-          math.dataset.amAnnot = id;
-          if (annot.kind) math.dataset.kind = annot.kind;
-          tagged.push(math);
+  // Paint every text mark of one block in a single pass.
+  //
+  // Two things this must not do: nest one mark inside another (two marks that overlap would leave <mark><mark>, and one Clear could
+  // not take the inner one out again), and lose the record a painted part belongs to. The painted parts carry the record's own id —
+  // its stored key and offsets — not the offsets relocate() found, so a click on the words still finds the record after the page
+  // changed.
+  //
+  // So the ranges of the whole block are worked out first, against the page as it stands, and each overlapping stretch is cut away
+  // from the mark painted after it. Only then does the DOM change: per text node, from the end backwards, so wrapping one part never
+  // moves the offsets of the parts still to come.
+  const subtract = (from, to, taken) => {
+    let pieces = [[from, to]];
+    for (const [a, b] of taken) {
+      const next = [];
+      for (const [s, e] of pieces) {
+        if (b <= s || a >= e) next.push([s, e]);
+        else {
+          if (a > s) next.push([s, a]);
+          if (b < e) next.push([b, e]);
         }
-        continue;
       }
-      const leadLen = lead.get(node) ?? 0;
-      const from = rawPos(node, part.from, leadLen);
-      const to = rawPos(node, part.to, leadLen);
-      if (to <= from) continue;
-      const range = document.createRange();
-      range.setStart(node, from);
-      range.setEnd(node, to);
-      const mark = document.createElement('mark');
-      mark.className = 'am-annot';
-      mark.dataset.amAnnot = id;
-      if (annot.kind) mark.dataset.kind = annot.kind;
-      range.surroundContents(mark);
-      tagged.push(mark);
+      pieces = next;
     }
-    if (!tagged.length) return false;
-    const sup = document.createElement('sup');
-    sup.className = 'am-annot-n';
-    sup.dataset.amAnnot = id;
-    if (annot.kind) sup.dataset.kind = annot.kind;
-    sup.textContent = String(n);
-    sup.title = annot.note || ui.kinds[annot.kind] || ui.button;
-    tagged.at(-1).after(sup);
-    return true;
+    return pieces.filter(([s, e]) => e > s);
   };
+  const paintAnnots = (el, list) => {
+    const { index, lead, text } = annotIndex(el);
+    const taken = [];  // block-text ranges a mark already covers, in paint order
+    const claimed = new Set(); // formulas a mark already covers; a formula cannot be split
+    const jobs = [];   // one wrap each: { node, from, to, id, kind, at }
+    // The shortest mark paints first, so it keeps its own words whole and the longer mark fills in around it. Either order avoids
+    // nesting; this one leaves both marks with something on the page to click and remove, where the longer-first order would leave a
+    // fully covered mark invisible and unreachable while it still counted in the reply.
+    const byLength = [...list].sort((a, b) => (a.end - a.start) - (b.end - b.start) || a.start - b.start);
+    for (const annot of byLength) {
+      const place = relocate(text, annot);
+      if (!place) continue;
+      const id = annotId(annot);
+      const pieces = subtract(place[0], place[1], taken);
+      if (!pieces.length) continue;
+      for (const [s, e] of pieces) {
+        taken.push([s, e]);
+        for (const part of sliceAt(index, s, e)) {
+          const node = part.id;
+          const math = formulaOf(node);
+          if (math) {
+            if (claimed.has(math) || math.classList.contains('am-annot')) continue;
+            claimed.add(math);
+            math.classList.add('am-annot');
+            math.dataset.amAnnot = id;
+            if (annot.kind) math.dataset.kind = annot.kind;
+            jobs.push({ math, id, kind: annot.kind, at: s });
+            continue;
+          }
+          const leadLen = lead.get(node) ?? 0;
+          const from = rawPos(node, part.from, leadLen);
+          const to = rawPos(node, part.to, leadLen);
+          if (to > from) jobs.push({ node, from, to, id, kind: annot.kind, at: s });
+        }
+      }
+    }
+    if (!jobs.length) return;
+    // The DOM work, grouped per text node and taken from the end of the node backwards. Wrapping (node, from, to) splits the node
+    // into three; every part with a smaller offset sits in the first piece and keeps its position.
+    const byNode = new Map();
+    for (const job of jobs) {
+      if (!job.node) continue;
+      if (!byNode.has(job.node)) byNode.set(job.node, []);
+      byNode.get(job.node).push(job);
+    }
+    for (const [node, group] of byNode) {
+      group.sort((a, b) => b.from - a.from);
+      for (const job of group) {
+        const range = document.createRange();
+        range.setStart(node, job.from);
+        range.setEnd(node, job.to);
+        const mark = document.createElement('mark');
+        mark.className = 'am-annot';
+        mark.dataset.amAnnot = job.id;
+        if (job.kind) mark.dataset.kind = job.kind;
+        // surroundContents throws when the range crosses an element boundary (a formula's MathML, an inline link). One part that
+        // cannot be wrapped must not lose the whole mark, so it is skipped and the rest still paint.
+        try {
+          range.surroundContents(mark);
+          job.el = mark;
+        } catch {
+          // as above: the other parts of this mark are still worth painting
+        }
+      }
+    }
+    // The number goes after the last part of its mark. The numbers themselves are written at the end of paintAllAnnots, in the
+    // order the marks sit on the page, so two overlapping marks still read 1 then 2 down the page whatever order they painted in.
+    const annotOf = new Map(list.map((a) => [annotId(a), a]));
+    const lastPart = new Map();
+    for (const job of jobs) {
+      const part = job.el ?? job.math;
+      if (!part) continue;
+      const seen = lastPart.get(job.id);
+      if (!seen || job.at >= seen.at) lastPart.set(job.id, { at: job.at, el: part, kind: job.kind });
+    }
+    for (const [id, part] of lastPart) {
+      const annot = annotOf.get(id);
+      const sup = document.createElement('sup');
+      sup.className = 'am-annot-n';
+      sup.dataset.amAnnot = id;
+      if (part.kind) sup.dataset.kind = part.kind;
+      sup.textContent = '0';  // numbered in paintAllAnnots, in the order the marks sit on the page
+      sup.title = annot?.note || ui.kinds[part.kind] || ui.button;
+      part.el.after(sup);
+    }
+  };
+  // Take every mark off the page. Marks are unwrapped from the inside out, so a mark that somehow ended up inside another one is
+  // still reachable; the loop repeats in case unwrapping one exposed another.
   const unpaintAnnots = () => {
     for (const sup of document.querySelectorAll('sup[data-am-annot]')) sup.remove();
-    for (const mark of document.querySelectorAll('mark.am-annot[data-am-annot]')) mark.replaceWith(...mark.childNodes);
+    for (let pass = 0; pass < 4; pass += 1) {
+      const marks = [...document.querySelectorAll('mark.am-annot[data-am-annot]')];
+      if (!marks.length) break;
+      for (const mark of marks.reverse()) mark.replaceWith(...mark.childNodes);
+    }
     for (const math of document.querySelectorAll('[data-am-annot]:not(sup):not(mark)')) {
       math.classList.remove('am-annot');
       delete math.dataset.amAnnot;
+      delete math.dataset.kind;
     }
   };
   // The block element of every key on the page, in page order: a stored mark names its block by key, and this finds it again.
@@ -350,24 +422,30 @@
     return range;
   };
 
-  // Page order: the blocks as the page lists them, and inside a block the words in reading order, so the numbers read 1, 2, 3.
+  // Page order: the blocks as the page lists them, and inside a block the words in reading order. Each block is painted in one pass
+  // (paintAnnots), and the numbers are written once at the end, over the marks the page really shows.
   const paintAllAnnots = () => {
     unpaintAnnots();
     if (!annots.size) return;
     const byKey = indexByKey();
     const order = new Map([...byKey.keys()].map((key, i) => [key, i]));
     const listed = [...annots.values()].filter((a) => byKey.has(a.key)).sort((p, q) => (order.get(p.key) - order.get(q.key)) || p.start - q.start);
-    let n = 0;
-    for (const annot of listed) if (paintAnnot(byKey.get(annot.key), annot, n + 1)) n += 1;
+    const byBlock = new Map();
+    for (const annot of listed) {
+      const el = byKey.get(annot.key);
+      if (!byBlock.has(el)) byBlock.set(el, []);
+      byBlock.get(el).push(annot);
+    }
+    for (const [el, group] of byBlock) paintAnnots(el, group);
+    // Number what the page shows, in the order it shows it. A mark that could not paint has no number, so the numbers run 1, 2, 3
+    // with no gap, and a mark the page cannot draw does not take a number the reader cannot see.
+    [...document.querySelectorAll('sup.am-annot-n')].forEach((sup, i) => { sup.textContent = String(i + 1); });
   };
 
   // The float: one click on a kind tags the words at once, so the reader never opens a box and submits it for each place. The box
   // takes a note, and Enter saves it; a note without a kind is a mark too. Escape puts the page back as it was.
   let picked = null;
   let editing = null;
-  // A record the reader reopened by a click on its words. It carries the words' place at the time of the click, which may not be
-  // the offsets the record was saved with, so the float edits the record itself rather than looking it up by offsets.
-  let reopened = null;
   const float = document.createElement('div');
   float.className = 'am-annot-float';
   float.hidden = true;
@@ -387,7 +465,6 @@
     float.hidden = true;
     picked = null;
     editing = null;
-    reopened = null;
     noteIn.value = '';
     dropBtn.hidden = true;
     showClear();
@@ -418,12 +495,25 @@
     const words = blockText(el).slice(offsets[0], offsets[1]);
     if (!words.trim()) return hideFloat();
     picked = { el, start: offsets[0], end: offsets[1] };
-    const key = keyMap().get(el);
-    editing = reopened?.key === key ? reopened : (annots.get(annotId({ key, start: picked.start, end: picked.end })) ?? [...annots.values()].find((a) => a.key === key && a.quote === words) ?? null);
+    // The mark under the selection, if there is one: each mark of this block is asked where it sits on the page now, so a mark whose
+    // text moved still matches its own words, and a selection on other words matches nothing (and starts a mark of its own). This is
+    // the one place a record is matched to a range, so a click on marked words and a hand selection of the same words agree.
+    editing = recordAt(el, picked.start, picked.end);
     noteIn.value = editing?.note ?? '';
     dropBtn.hidden = !editing;
     float.hidden = false;
     placeFloat(range.getBoundingClientRect());
+  };
+  // The text mark of this block that covers exactly [start, end) of the block's page text.
+  const recordAt = (el, start, end) => {
+    const byKey = indexByKey();
+    const text = blockText(el);
+    for (const annot of annots.values()) {
+      if (byKey.get(annot.key) !== el) continue;
+      const place = relocate(text, annot);
+      if (place && place[0] === start && place[1] === end) return annot;
+    }
+    return null;
   };
   const saveAnnot = (kind) => {
     if (!picked) return;
@@ -439,7 +529,9 @@
       quote: words,
       prefix: text.slice(Math.max(0, picked.start - 32), picked.start),
       suffix: text.slice(picked.end, picked.end + 32),
-      kind: kind || '',
+      // A tag button names the kind; Enter in the note box keeps the kind the mark already had (an empty string only for a mark that
+      // never had one). Without this, adding a note to a "keep" mark silently turned it into a plain quote.
+      kind: kind || editing?.kind || '',
       note: noteIn.value.trim(),
     };
     if (editing) annots.delete(annotId(editing));
@@ -507,7 +599,6 @@
     const selection = window.getSelection();
     selection?.removeAllRanges();
     selection?.addRange(range);
-    reopened = record;
     showFloat();
   };
   // A pick on the words opens the float; typing a note keeps it open, and any other change of the selection reads again.
@@ -635,8 +726,31 @@
     // A pick on the words is the float's: the block popover waits until the range is gone.
     if (!float.hidden) return;
     if (e.target.closest?.('[data-am-annot]')) return;
+    // A drag that ends inside a block also fires a click on that block. The reader was picking words, not the block, so a click that
+    // comes right after a selection change inside the block it lands on opens nothing: the float is the only thing that appears.
+    if (dragPicked(e.target)) return;
     const el = blockAt(e.target);
     if (el) open(el);
+  };
+  // A click that follows a drag belongs to that drag, not to the block: the reader was picking words. Two signs say so — the live
+  // selection still covers words in this block, or a selection change in this block happened a moment ago (a browser may collapse
+  // the selection before it fires the click).
+  let lastSelection = null;
+  const blockOfNode = (node) => blockAt(node.nodeType === 3 ? node.parentElement : node);
+  const markSelection = () => {
+    const selection = window.getSelection();
+    const range = selection && !selection.isCollapsed && selection.rangeCount === 1 ? selection.getRangeAt(0) : null;
+    if (!range) return;
+    const el = blockOfNode(range.startContainer);
+    if (el) lastSelection = { el, at: Date.now() };
+  };
+  const dragPicked = (target) => {
+    const el = blockAt(target);
+    const selection = window.getSelection();
+    if (el && selection && !selection.isCollapsed && selection.rangeCount === 1 && blockOfNode(selection.getRangeAt(0).startContainer) === el) return true;
+    const recent = lastSelection && Date.now() - lastSelection.at <= 600 ? lastSelection : null;
+    lastSelection = null;
+    return Boolean(recent) && el === recent.el;
   };
   // The keyboard picks too: while the mode is on, every block takes focus with Tab, and Enter or Space opens its popover. A block
   // that already had a tabindex keeps it; only the ones the mode added lose it again.
@@ -667,6 +781,7 @@
     document.body[toggle]('keydown', pickKey);
     // A change of the selection reads while the mode is on: the float is the only thing that appears.
     document[toggle]('selectionchange', readSelection);
+    document[toggle]('selectionchange', markSelection);
     document[toggle]('click', openWords, true);
     focusable(on);
     if (!on) {
@@ -690,17 +805,33 @@
   window.addEventListener('resize', () => { if (!float.hidden && !typing()) hideFloat(); });
   setMode(false);
 
-  // What the Reply button reads: the marked blocks and the marked words that are on the page, in page order.
-  window.__amRemarkData = () => {
-    if (!marks.size && !annots.size) return [];
-    const live = [];
+  // What the Reply button reads: the marked blocks and the marked words that are on the page, in page order. Each entry carries the
+  // key of the record it came from (`mark` for a block mark, `annot` for a text mark), so the reply sheet can drop exactly that one.
+  const live = () => {
+    const out = [];
     for (const [el, key] of keyMap()) {
       const mark = marks.get(key);
-      if (mark) live.push({ panel: panelOf(el), quote: quote(blockText(el)), kind: mark.kind, note: mark.note });
+      if (mark) out.push({ panel: panelOf(el), quote: quote(blockText(el)), kind: mark.kind, note: mark.note, mark: key });
       // The marked words of this block, in reading order, after the block itself: a mark on the whole block is the outer range.
       const own = [...annots.values()].filter((a) => a.key === key).sort((p, q) => p.start - q.start);
-      for (const a of own) live.push({ panel: panelOf(el), quote: quoteAt(a.quote, 0, a.quote.length), kind: a.kind, note: a.note, words: true });
+      for (const a of own) out.push({ panel: panelOf(el), quote: quoteAt(a.quote, 0, a.quote.length), kind: a.kind, note: a.note, words: true, annot: annotId(a) });
     }
-    return live;
+    return out;
+  };
+  window.__amRemarkData = () => (marks.size || annots.size ? live() : []);
+  // The reply sheet's preview drops one entry by the place it holds in __amRemarkData: the same list, so the same index.
+  window.__amRemarkDrop = (index) => {
+    const entry = live()[index];
+    if (!entry) return false;
+    if (entry.annot) annots.delete(entry.annot);
+    else marks.delete(entry.mark);
+    save();
+    paintAllAnnots();
+    for (const [el, key] of keyMap()) {
+      const mark = marks.get(key);
+      if (mark) paint(el, mark);
+      else unpaint(el);
+    }
+    return true;
   };
 })();

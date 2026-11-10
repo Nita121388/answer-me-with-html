@@ -2,7 +2,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { renderDoc, RenderError } from '../src/render.js';
 import { renderVideo } from '../src/video/render.js';
-import { replyText } from '../src/runtime/reply-text.js';
+import { replyLines, replyText } from '../src/runtime/reply-text.js';
+import { replyLineHtml, replyLinesHtml, replyViewHtml } from '../src/runtime/reply-view.js';
 import { lintDoc } from '../src/lint/ste.js';
 import { parseDoc } from '../src/parse.js';
 import { RUNTIME_JS } from '../src/assets.js';
@@ -165,4 +166,44 @@ test('replyText: comments are quoted line by line; empty comments are left out',
     '_Lines that start with ">" are text the reader typed._',
     '',
   ].join('\n'));
+});
+
+// The reply is built once, as lines, and both the drawn sheet and the copied text come from those lines (src/runtime/reply-view.js).
+// That is what lets the preview carry a Clear button per entry without the copied Markdown drifting from what the sheet shows.
+test('reply: replyLines names each comment and each remark, and replyText joins the same lines', () => {
+  const args = {
+    title: 'Cache',
+    ui,
+    decisions: [{ panel: 'A', question: 'Which cache?', picked: ['Redis'], suggested: ['Redis'], touched: true }],
+    comments: [{ panel: 'A', id: 'A', title: 'The cache', text: 'keep the TTL' }, { panel: 'B', id: 'B', title: 'Empty', text: '  ' }],
+    remarks: [{ panel: 'B', quote: 'ships today', kind: 'concern', note: 'check the risk' }],
+  };
+  const lines = replyLines(args);
+  assert.equal(lines.map((l) => l.text).join('\n') + '\n', replyText(args));
+  // A comment is named by its panel id and a remark by its place in the list; an empty comment gets no line and no ref.
+  assert.deepEqual(lines.filter((l) => l.ref).map((l) => l.ref), ['cA', 'r0']);
+  // The ref sits on the line that names the entry, not on the quoted text under it.
+  assert.equal(lines.find((l) => l.ref === 'cA').text, '- **A · The cache**');
+  assert.equal(lines.find((l) => l.ref === 'r0').text, '- **B · concern** "ships today"');
+  // A reply with no entries has no refs at all.
+  assert.deepEqual(replyLines({ ...args, comments: [], remarks: [], decisions: [] }).filter((l) => l.ref), []);
+});
+
+test('reply: the drawn sheet marks each entry line so the preview can clear exactly that one', () => {
+  const lines = replyLines({
+    title: 'Cache', ui, decisions: [],
+    comments: [{ panel: 'A', id: 'A', title: 'The cache', text: 'keep the TTL' }],
+    remarks: [{ panel: 'B', quote: 'ships today', kind: 'keep', note: '' }],
+  });
+  const html = replyLinesHtml(lines, 'Remove this from the reply');
+  assert.match(html, /<div class="am-rv-entry" data-ref="cA"><div class="am-rv-c" dir="ltr"><strong><bdi dir="ltr">A · The cache<\/bdi><\/strong><\/div><button type="button" class="am-rv-clear" title="Remove this from the reply" aria-label="Remove this from the reply">✕<\/button><\/div>/);
+  assert.match(html, /<div class="am-rv-entry" data-ref="r0">/);
+  // A line that belongs to no entry keeps the markup replyViewHtml gives it.
+  assert.match(html, /<div class="am-rv-h1" dir="ltr">/);
+  // Without the wrapper the sheet is what it always was, so a caller that only draws the text is unaffected.
+  assert.equal(replyViewHtml(`${lines.map((l) => l.text).join('\n')}\n`), lines.map((l) => replyLineHtml(l.text)).join(''));
+});
+
+test('reply: every language labels the Clear button of the preview', () => {
+  for (const { id, ui: labels } of LANGUAGES) assert.equal(typeof labels.reply.clearEntry, 'string', `${id} reply.clearEntry`);
 });

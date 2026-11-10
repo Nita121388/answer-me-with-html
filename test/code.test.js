@@ -163,7 +163,12 @@ test('runtime: a code block copies its lines without the line numbers', async ()
   const code = readFileSync(new URL('../src/runtime/page.js', import.meta.url), 'utf8');
   let copied = null;
   const listeners = {};
-  const lines = ['const a = 1;', '  return a;'].map((t) => ({ textContent: t }));
+  // A line as the page builds it: a text node, plus the mark furniture (a note chip, a number) a remark can add inside it.
+  const line = (textContent, extras = []) => ({
+    textContent: textContent + extras.map((e) => e.textContent).join(''),
+    cloneNode: () => ({ textContent, querySelectorAll: () => extras }),
+  });
+  const lines = [line('const a = 1;'), line('  return a;', [{ remove() {} }])];
   const button = {
     textContent: 'Copy',
     dataset: { done: 'Copied ✓' },

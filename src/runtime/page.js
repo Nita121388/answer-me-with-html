@@ -175,12 +175,18 @@
     });
   }
 
-  // Each code block copies its own lines, without the line numbers.
+  // Each code block copies its own lines, without the line numbers. A mark the reader put on the code (src/runtime/remark.js)
+  // adds its note chip and its number inside those lines, so both are taken out first: what is copied is the code, not the furniture.
+  const codeText = (line) => {
+    const copy = line.cloneNode(true);
+    for (const el of copy.querySelectorAll('.am-annot-n, .am-mark-note')) el.remove();
+    return copy.textContent;
+  };
   for (const btn of document.querySelectorAll('[data-am="copy-code"]')) {
     const flash = flasher(btn);
     btn.addEventListener('click', async () => {
       const lines = btn.closest('.am-codeblock')?.querySelectorAll('.am-ln') ?? [];
-      await copyText([...lines].map((l) => l.textContent).join('\n'));
+      await copyText([...lines].map(codeText).join('\n'));
       flash();
     });
   }

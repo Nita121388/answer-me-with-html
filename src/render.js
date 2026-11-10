@@ -355,6 +355,7 @@ ${notice.button}${pick('theme', ui.theme, embedded.map((t) => [t.name, t.label[l
 ${pick('mode', ui.modeLabel, Object.entries(ui.mode), meta.mode)}
 ${pick('measure', ui.measureLabel, Object.entries(ui.measure), meta.width)}
 ${scaleButtons(ui)}
+<button class="am-btn am-btn--fold" type="button" data-am="fold-all" data-ui="${esc(JSON.stringify(ui.fold))}" aria-label="${esc(ui.fold.collapse)}" title="${esc(ui.fold.collapse)}" hidden>${esc(ui.fold.collapse)}</button>
 <button class="am-btn am-btn--reply" type="button" data-am="reply" data-ui="${esc(JSON.stringify({ ...ui.reply, done: ui.done, remarks: ui.remark.section, kinds: ui.remark.kinds, words: ui.remark.words, ...(closeAfter ? { closeAfter: { seconds: CLOSE_AFTER_SECONDS, ...ui.closeAfter } } : {}) }))}">${esc(ui.reply.button)}</button>
 <button class="am-btn am-btn--remark" type="button" data-am="remark" data-ui="${esc(JSON.stringify(ui.remark))}">${esc(ui.remark.button)}</button>
 ${meta.drag === true ? `<button class="am-btn" type="button" data-am="reset-order" hidden>${esc(ui.resetOrder)}</button>` : ''}

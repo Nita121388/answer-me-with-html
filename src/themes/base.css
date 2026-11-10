@@ -246,6 +246,16 @@ html[data-am-dragging] .am-panel--moving { opacity: .45; outline: 2px dashed var
 }
 .am-rv-a { padding-inline-start: 1.6em; }
 .am-rv-a em { color: var(--ink-2); }
+/* One comment or one mark in the reply preview: the drawn line plus the button that drops it from the reply. The button stays quiet
+   until the pointer or the keyboard reaches the line, so the preview still reads as the reply and not as a form. */
+.am-rv-entry { display: flex; align-items: flex-start; gap: 6px; }
+.am-rv-entry > div { flex: 1 1 auto; min-width: 0; }
+.am-rv-clear {
+  flex: none; font: var(--am-fs-small)/1 var(--font-sans); color: var(--ink-3); background: none; border: 0; border-radius: var(--radius);
+  padding: 2px 5px; cursor: pointer; opacity: .55;
+}
+.am-rv-entry:hover .am-rv-clear, .am-rv-clear:focus-visible { opacity: 1; color: var(--err); }
+.am-rv-clear:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .am-rv-quote { margin-inline-start: 1em; padding-inline-start: 10px; border-inline-start: 3px solid var(--line-2); color: var(--ink-2); white-space: pre-wrap; }
 .am-reply-raw summary { margin-top: 10px; margin-bottom: 6px; font-size: var(--am-fs-small); color: var(--ink-2); cursor: pointer; }
 /* The bar at the bottom of the page: counts and one-click copy, so the reader need not go to the Reply button at the top. */
@@ -640,7 +650,7 @@ html[data-measure="full"] .am-doc { max-width: calc(100vw - 56px); }
 .am-colophon a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
 
 @media print {
-  .am-toolbar, .am-diagram-expand, .am-lightbox, .am-code-copy, .am-toc, .am-comment-btn, .am-comment, .am-reply, .am-reply-bar { display: none !important; }
+  .am-toolbar, .am-diagram-expand, .am-lightbox, .am-code-copy, .am-toc, .am-comment-btn, .am-comment, .am-reply, .am-reply-bar, .am-btn--fold { display: none !important; }
   body { background: var(--paper); }
   .am-panel { break-inside: avoid; box-shadow: none; }
 }

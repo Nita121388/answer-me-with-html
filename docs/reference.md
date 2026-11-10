@@ -39,6 +39,10 @@ Every page has a **Reply** button. The reader comments on any panel (the speech-
 
 The **Remark** button turns on block marking. While it is on, the reader clicks a paragraph, list item, quote, code block, table or $$ formula block, picks a kind (suggestion, keep, question or concern) and may add a note. The mark shows on the block, survives a reload, and comes back in the reply under Remarks with the start of the block quoted. A page title or panel title takes no mark; use the panel comment for it.
 
+The reader can also mark the words inside a block: select them and the float offers the same four kinds in one click, plus a note box. Two marks may overlap; the page splits the shared words between them instead of nesting one inside the other, and the numbers still read 1, 2, 3 down the page. A mark keeps the kind it already has when a note is added to it, and a mark whose block changed is found again by its words after `am patch`.
+
+Every comment and every remark in the Reply sheet has a **✕** that drops that one entry: the panel comment box empties, or the mark leaves the page, and the copied text follows. The panel comment box itself is unchanged.
+
 While remark mode is on, `Tab` also reaches every block, and `Enter` or `Space` opens its popover. The popover works from the keyboard. Its tags are numbered: `1`–`4` pick one and move the focus to the note (inside the note, digits are text). Until a tag is picked, Save stays off and the popover says so. `Ctrl` / `⌘` + `Enter` saves. Closing the popover without Save (`Esc` or a click outside) keeps its tag and note as a draft for that block until the page reloads; **Clear all remarks** drops drafts too.
 
 For a decision the reader must make, write an `ask` block in the panel it changes:
