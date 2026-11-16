@@ -135,8 +135,8 @@ test('remark: a click that ends a drag picks words, not the block', () => {
 });
 
 test('remark: adding a note keeps the kind a mark already had, and the mark under a selection is found by where it sits', () => {
-  // Enter in the note box saves without naming a kind: the record keeps the one it has.
-  assert.match(RUNTIME_JS, /kind: kind \|\| editing\?\.kind \|\| '',/);
+  // Enter in the input saves without naming a kind: the record keeps the one it has (a legacy record; a new mark has none).
+  assert.match(RUNTIME_JS, /kind: mark\?\.kind \?\? '',/);
   // The mark a selection edits is the one that covers exactly those words now, so a mark that moved is still found and a selection
   // on other words matches nothing (and starts a mark of its own) instead of replacing the mark the reader had clicked.
   assert.match(RUNTIME_JS, /editing = recordAt\(el, picked\.start, picked\.end\);/);

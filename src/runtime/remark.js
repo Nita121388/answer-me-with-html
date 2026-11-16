@@ -1,11 +1,14 @@
-// Remark mode: the reader turns it on, clicks a block, tags it (suggestion, keep, question, concern) and may add a note.
-// A mark shows as a bar and a note chip inside the block, lives in localStorage like panel comments, and the Reply button carries it
-// back to the agent: reply.js calls window.__amRemarkData, and replyText (reply-text.js) writes the Remarks section.
+// Remark mode: the reader turns it on, clicks a block or picks words, and writes one line of note in a single input.
+// A block mark shows as a bar and a note chip inside the block; a word mark as a highlight. Marks live in localStorage like panel
+// comments, and the Reply button carries them back: reply.js calls window.__amRemarkData, and replyText writes the Remarks section.
+// New marks carry no kind (''); a record saved before kinds were dropped keeps its own and still reads, chip and reply label alike.
 (() => {
   const btn = document.querySelector('[data-am="remark"]');
   if (!btn) return;
   const ui = JSON.parse(btn.dataset.ui);
-  const KINDS = ['suggestion', 'keep', 'question', 'concern'];
+  // The kinds an older page could store. New marks carry none, but a stored record that has one keeps it: the chip and the reply
+  // still label it with the same words.
+  const LEGACY_KINDS = ['suggestion', 'keep', 'question', 'concern'];
   const storeKey = `am-remark:${location.pathname}`;
   // A page served by `am serve` has no localStorage and the phone may discard its tab; it keeps the marks on the server, in the
   // same record as the answers (reply.js), so a re-opened page finds them again.
@@ -99,7 +102,7 @@
   // every page marked before text marks existed holds.
   const isAnnot = (m) => Number.isInteger(m?.start) && Number.isInteger(m?.end) && typeof m?.quote === 'string';
   const annotId = (a) => `${a.key}\u0001${a.start}-${a.end}`;
-  const usable = (m) => typeof m?.key === 'string' && (isAnnot(m) || KINDS.includes(m.kind));
+  const usable = (m) => typeof m?.key === 'string' && (isAnnot(m) || m.kind === '' || LEGACY_KINDS.includes(m.kind));
   const load = () => {
     const restored = serve?.restored?.remark;
     if (Array.isArray(restored)) return restored.filter(usable);
@@ -125,14 +128,12 @@
     kind: String(m.kind ?? ''),
     note: String(m.note ?? ''),
   }]));
-  // Kind and note of a popover closed without Save, by block key, until the page reloads (see open below).
-  const drafts = new Map();
   const clearBtn = document.createElement('button');
   clearBtn.type = 'button';
   clearBtn.className = 'am-btn am-btn--remark-clear';
   clearBtn.textContent = ui.clear;
-  // Clear all drops saved marks and drafts, so it shows while either exists.
-  const toClear = () => marks.size + drafts.size + annots.size;
+  // Clear all drops saved marks, so it shows while any exists.
+  const toClear = () => marks.size + annots.size;
   const showClear = () => { clearBtn.hidden = toClear() === 0; };
   btn.insertAdjacentElement('afterend', clearBtn);
   let clearTimer = null;
@@ -161,8 +162,6 @@
     // Text marks go with the block marks: one Clear all empties the page.
     unpaintAnnots();
     annots.clear();
-    // A draft is a remark the reader has not saved yet; Clear all drops it too, so no block reopens with an old kind.
-    drafts.clear();
     try {
       localStorage.removeItem(storeKey);
     } catch {
@@ -185,19 +184,26 @@
     showClear();
   };
 
+  // The chip is the note, and the kind too when the record predates the bare input. A mark saved today always has a note: an input
+  // emptied takes the mark off.
   const chip = (el, mark) => {
     const note = document.createElement(el.localName === 'table' ? 'caption' : 'span');
     note.className = 'am-mark-note';
-    const kind = document.createElement('b');
-    kind.textContent = ui.kinds[mark.kind];
-    note.append(kind, mark.note ? ` ${mark.note}` : '');
+    if (mark.kind) {
+      const kind = document.createElement('b');
+      kind.textContent = ui.kinds[mark.kind] ?? mark.kind;
+      note.append(kind, mark.note ? ` ${mark.note}` : '');
+    } else {
+      note.textContent = mark.note;
+    }
     return note;
   };
   const clearChip = (el) => el.querySelector(':scope > .am-mark-note')?.remove();
   const paint = (el, mark) => {
     clearChip(el);
     el.classList.add('am-mark');
-    el.dataset.kind = mark.kind;
+    if (mark.kind) el.dataset.kind = mark.kind;
+    else delete el.dataset.kind;
     // Inside the block, so a list item stays a child of its list. A table takes it as its caption; a list item with a sub-list shows
     // it under its own text, before the sub-list.
     const sub = el.querySelector(':scope > ul, :scope > ol');
@@ -442,8 +448,8 @@
     [...document.querySelectorAll('sup.am-annot-n')].forEach((sup, i) => { sup.textContent = String(i + 1); });
   };
 
-  // The float: one click on a kind tags the words at once, so the reader never opens a box and submits it for each place. The box
-  // takes a note, and Enter saves it; a note without a kind is a mark too. Escape puts the page back as it was.
+  // The float: one input on the picked words. Enter saves, Escape puts the page back as it was, and an existing mark whose note
+  // the reader erased goes with the input. No placeholder: the words under it say what it is about.
   let picked = null;
   let editing = null;
   const float = document.createElement('div');
@@ -453,20 +459,13 @@
   float.setAttribute('aria-label', ui.button);
   const noteIn = document.createElement('input');
   noteIn.type = 'text';
-  noteIn.placeholder = ui.hint;
   noteIn.setAttribute('aria-label', ui.hint);
-  const dropBtn = document.createElement('button');
-  dropBtn.type = 'button';
-  dropBtn.className = 'am-btn';
-  dropBtn.textContent = ui.remove;
-  dropBtn.hidden = true;
   const hideFloat = () => {
     if (float.hidden) return;
     float.hidden = true;
     picked = null;
     editing = null;
     noteIn.value = '';
-    dropBtn.hidden = true;
     showClear();
   };
   const placeFloat = (rect) => {
@@ -500,7 +499,6 @@
     // the one place a record is matched to a range, so a click on marked words and a hand selection of the same words agree.
     editing = recordAt(el, picked.start, picked.end);
     noteIn.value = editing?.note ?? '';
-    dropBtn.hidden = !editing;
     float.hidden = false;
     placeFloat(range.getBoundingClientRect());
   };
@@ -515,10 +513,14 @@
     }
     return null;
   };
-  const saveAnnot = (kind) => {
+  const saveAnnot = () => {
     if (!picked) return;
     const key = keyMap().get(picked.el);
     if (typeof key !== 'string') return hideFloat();
+    const note = noteIn.value.trim();
+    // An existing mark whose note the reader erased goes: the input is all the mark says. A new mark may have none — the picked
+    // words themselves are it.
+    if (editing && !note) return dropAnnot();
     const text = blockText(picked.el);
     const words = text.slice(picked.start, picked.end);
     if (!words.trim()) return hideFloat();
@@ -529,10 +531,9 @@
       quote: words,
       prefix: text.slice(Math.max(0, picked.start - 32), picked.start),
       suffix: text.slice(picked.end, picked.end + 32),
-      // A tag button names the kind; Enter in the note box keeps the kind the mark already had (an empty string only for a mark that
-      // never had one). Without this, adding a note to a "keep" mark silently turned it into a plain quote.
-      kind: kind || editing?.kind || '',
-      note: noteIn.value.trim(),
+      // A record saved before kinds were dropped keeps its own; a new mark has none.
+      kind: editing?.kind ?? '',
+      note,
     };
     if (editing) annots.delete(annotId(editing));
     annots.set(annotId(record), record);
@@ -549,19 +550,7 @@
     paintAllAnnots();
     window.getSelection()?.removeAllRanges();
   };
-  const kindPick = KINDS.map((k, i) => {
-    const b = document.createElement('button');
-    b.type = 'button';
-    b.className = 'am-remark-kind';
-    b.dataset.kind = k;
-    // The number a reader can press to tag the words without the pointer, as the block popover shows it.
-    b.dataset.n = String(i + 1);
-    b.textContent = ui.kinds[k];
-    b.addEventListener('click', () => saveAnnot(k));
-    return b;
-  });
-  dropBtn.addEventListener('click', () => dropAnnot());
-  float.append(...kindPick, dropBtn, noteIn);
+  float.append(noteIn);
   document.body.append(float);
   // A press inside the float keeps the selection; only the box takes the focus, so a note can be typed.
   float.addEventListener('pointerdown', (e) => { if (e.target !== noteIn) e.preventDefault(); });
@@ -572,16 +561,9 @@
       window.getSelection()?.removeAllRanges();
       return;
     }
-    if (e.target === noteIn) {
-      if (e.key === 'Enter' && !e.isComposing) {
-        e.preventDefault();
-        saveAnnot('');
-      }
-      return;
-    }
-    if (/^[1-4]$/.test(e.key) && !e.ctrlKey && !e.metaKey && !e.altKey) {
+    if (e.target === noteIn && e.key === 'Enter' && !e.isComposing) {
       e.preventDefault();
-      saveAnnot(KINDS[Number(e.key) - 1]);
+      saveAnnot();
     }
   });
   // A click on marked words selects them again and opens the float on that mark, so a note can be changed or dropped without
@@ -610,8 +592,8 @@
   };
   paintAllAnnots();
 
-  // The popover edits one block. Save stays off until a kind is picked, and a hint says so. 1–4 pick a kind from the keyboard and
-  // move to the note; Ctrl / Cmd + Enter saves. A popover closed without Save keeps its kind and note as a draft for that block until the page reloads.
+  // The popover edits one block with a single input. Enter saves; on a marked block whose input was emptied, Enter takes the mark
+  // off; Escape closes leaving the page as it was.
   const pop = document.createElement('div');
   pop.className = 'am-remark-pop';
   pop.hidden = true;
@@ -620,11 +602,8 @@
   document.body.append(pop);
   let opener = null;
   let anchor = null;
-  let keepDraft = null;
   const close = (restoreFocus) => {
     if (pop.hidden) return;
-    keepDraft?.();
-    keepDraft = null;
     pop.hidden = true;
     if (restoreFocus) (opener?.isConnected && opener !== document.body ? opener : btn).focus();
   };
@@ -641,75 +620,31 @@
   const open = (el) => {
     const key = keyMap().get(el);
     const mark = marks.get(key);
-    const draft = drafts.get(key);
-    let kind = draft?.kind ?? mark?.kind ?? '';
     opener = document.activeElement;
     anchor = el;
-
-    const note = make('textarea', { rows: 2, placeholder: ui.hint, value: draft?.note ?? mark?.note ?? '' });
-    note.setAttribute('aria-label', ui.hint);
-    const keep = make('button', { type: 'button', className: 'am-btn', textContent: ui.save, disabled: !kind });
-    const need = make('span', { className: 'am-remark-need', textContent: ui.need, hidden: Boolean(kind) });
-    keepDraft = () => {
-      if (kind || note.value.trim()) drafts.set(key, { kind, note: note.value });
-      else drafts.delete(key);
-      showClear();
-    };
-    const done = () => { drafts.delete(key); keepDraft = null; showClear(); };
-    keep.addEventListener('click', () => {
-      done();
-      const saved = { key, kind, note: note.value.trim() };
-      marks.set(key, saved);
-      save();
-      paint(el, saved);
-      close(true);
-    });
-    const actions = make('div', { className: 'am-remark-actions' });
-    actions.append(keep);
-    if (mark) {
-      const drop = make('button', { type: 'button', className: 'am-btn', textContent: ui.remove });
-      drop.addEventListener('click', () => {
-        done();
+    const input = make('input', { type: 'text', value: mark?.note ?? '' });
+    input.setAttribute('aria-label', ui.hint);
+    input.addEventListener('keydown', (e) => {
+      if (e.key !== 'Enter' || e.isComposing) return;
+      e.preventDefault();
+      const note = input.value.trim();
+      if (note) {
+        const saved = { key, kind: mark?.kind ?? '', note };
+        marks.set(key, saved);
+        save();
+        paint(el, saved);
+      } else if (mark) {
+        // The input holds all the mark says: emptied, the mark goes with it.
         marks.delete(key);
         save();
         unpaint(el);
-        close(true);
-      });
-      actions.append(drop);
-    }
-    const choose = (k) => {
-      kind = k;
-      for (const other of kindBtns) other.setAttribute('aria-pressed', String(other.dataset.kind === k));
-      keep.disabled = false;
-      need.hidden = true;
-    };
-    const kindBtns = KINDS.map((k, i) => {
-      const kb = make('button', { type: 'button', className: 'am-remark-kind', textContent: ui.kinds[k] });
-      kb.dataset.kind = k;
-      kb.dataset.n = i + 1;
-      kb.setAttribute('aria-pressed', String(k === kind));
-      kb.addEventListener('click', () => choose(k));
-      return kb;
-    });
-    // Ctrl / Cmd + Enter presses Save (nothing while Save waits for a kind). A digit types into the note, so it picks a kind
-    // only while the focus is outside the note.
-    pop.onkeydown = (e) => {
-      if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && !e.isComposing) {
-        e.preventDefault();
-        if (!keep.disabled) keep.click();
-        return;
       }
-      if (e.target === note || e.ctrlKey || e.metaKey || e.altKey || !/^[1-4]$/.test(e.key)) return;
-      e.preventDefault();
-      choose(KINDS[Number(e.key) - 1]);
-      note.focus();
-    };
-    actions.append(need);
-    pop.replaceChildren(make('div', { className: 'am-remark-kinds' }), note, actions);
-    pop.firstChild.append(...kindBtns);
+      close(true);
+    });
+    pop.replaceChildren(input);
     pop.hidden = false;
     place();
-    (kindBtns.find((b) => b.dataset.kind === kind) ?? kindBtns[0]).focus({ preventScroll: true });
+    input.focus({ preventScroll: true });
   };
 
   // Picking works only while remark mode is on. A click on a marked block edits its mark, on a plain block starts one.
