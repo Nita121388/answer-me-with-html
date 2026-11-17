@@ -246,6 +246,13 @@ html[data-am-dragging] .am-panel--moving { opacity: .45; outline: 2px dashed var
 /* The icon is painted, never hit: the browser decides whether a click folds the panel from the element it landed on, and an
    <svg> is not an interactive element, so an icon that took the pointer would fold the panel instead of opening the comment. */
 .am-comment-btn > svg { pointer-events: none; }
+/* The bubble fills while its box is open, so the icon alone says open or closed \u2014 with a note in it or without, where the accent
+   color already means "has text" and would otherwise hide the difference. The shape says open/closed, the color says filled in. */
+.am-comment-btn > svg { transition: fill .15s; }
+.am-comment-btn[aria-expanded="true"] > svg { fill: currentColor; }
+@media (prefers-reduced-motion: reduce) {
+  .am-comment-btn > svg { transition: none; }
+}
 .am-panel--bare { position: relative; }
 .am-panel--bare > .am-comment-btn { position: absolute; top: 4px; inset-inline-end: 0; }
 .am-comment { padding: 0 14px 12px; }

@@ -512,16 +512,20 @@ test('canvas: on a foldable board the comment button, the port and the head each
     await new Promise((r) => setTimeout(r, 300));
   };
 
-  // The comment button opens the box and does not fold the panel it lives in.
+  // The comment button opens the box and does not fold the panel it lives in. The icon fills while the box is open, so the shape
+  // says open or closed and the accent color stays free to mean "has text".
+  const iconFill = () => evaluate(`getComputedStyle(document.querySelector('#panel-A .am-comment-btn > svg')).fill`);
   await press('#panel-A .am-comment-btn');
   assert.equal(await commentOpen(), true, 'the comment box opened');
   assert.equal(await foldOpen(), true, 'and the panel did not fold');
   assert.equal(await evaluate('document.activeElement.tagName'), 'TEXTAREA', 'focus went into the box');
+  assert.notEqual(await iconFill(), 'none', 'the bubble fills while its box is open');
 
-  // A second press closes it, again without folding.
+  // A second press closes it, again without folding, and the bubble goes hollow again.
   await press('#panel-A .am-comment-btn');
   assert.equal(await commentOpen(), false, 'the box closed');
   assert.equal(await foldOpen(), true, 'still not folded');
+  assert.equal(await iconFill(), 'none', 'the bubble is hollow again once the box is closed');
 
   // The port starts an edge even though the head it sits next to is a summary.
   const port = await rectOf('#panel-A [data-am="canvas-port"]');
