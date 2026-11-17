@@ -35,13 +35,13 @@ Full syntax for a component: `am help <component>`.
 
 ## Answer on the page
 
-Every page has a **Reply** button. The reader comments on any panel (the speech-bubble button in its title bar) and copies one Markdown reply back to the agent. Answers and comments survive a reload. Once the reader answers, comments or remarks, a bar at the bottom of the page shows the counts and copies the reply in one click; the Reply sheet shows the reply drawn, with the copied Markdown under a fold.
+Every page has a **Reply** button. The reader comments on any panel or sub-panel (the speech-bubble button in its title bar; a sub-panel has its own button, and the reply names its comment by the sub-panel's ID, `A1`) and copies one Markdown reply back to the agent. Answers and comments survive a reload. Once the reader answers, comments or remarks, a bar at the bottom of the page shows the counts and copies the reply in one click; the Reply sheet shows the reply drawn, with the copied Markdown under a fold.
 
 The **Remark** button turns on block marking. While it is on, the reader clicks a paragraph, list item, quote, code block, table or $$ formula block and writes one line of note in a single input; `Enter` saves it and `Esc` closes the input. Clearing the input and pressing `Enter` on a marked block takes the mark off. The mark shows on the block, survives a reload, and comes back in the reply under Remarks with the start of the block quoted. A page title or panel title takes no mark; use the panel comment for it.
 
 The reader can also mark the words inside a block: select them and a float with one input appears on the words, so a note is a sentence and not a form. Two marks may overlap; the page splits the shared words between them instead of nesting one inside the other, and the numbers still read 1, 2, 3 down the page. A mark whose block changed is found again by its words after `am patch`.
 
-Every comment and every remark in the Reply sheet has a **✕** that drops that one entry: the panel comment box empties, or the mark leaves the page, and the copied text follows. The panel comment box itself is unchanged.
+Every comment and every remark in the Reply sheet has a **✕** that drops that one entry: the panel or sub-panel comment box empties, or the mark leaves the page, and the copied text follows. The comment box itself is unchanged.
 
 While remark mode is on, `Tab` also reaches every block, and `Enter` or `Space` opens its popover. The popover is one input and works from the keyboard: `Enter` saves the note, `Esc` closes it and leaves the page as it was.
 

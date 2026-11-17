@@ -189,6 +189,28 @@ test('reply: replyLines names each comment and each remark, and replyText joins 
   assert.deepEqual(replyLines({ ...args, comments: [], remarks: [], decisions: [] }).filter((l) => l.ref), []);
 });
 
+// A comment on a sub-panel names the sub-panel itself ("A1 · Client"), the board the reader wrote it in — the same place a
+// remark inside that sub-panel names — so a reply speaks of one place for every kind of input (src/runtime/reply.js, panelOf).
+test('reply: a comment on a sub-panel names that sub-panel, and its ref keeps it clearable on its own', () => {
+  const lines = replyLines({
+    title: 'Layers',
+    ui,
+    decisions: [],
+    comments: [
+      { panel: 'A', id: 'A', title: 'The layers', text: 'keep three' },
+      { panel: 'A1', id: 'A1', title: 'Client', text: 'split the bundle' },
+    ],
+    remarks: [{ panel: 'A1', quote: 'runs offline', kind: 'concern', note: 'the service worker' }],
+  });
+  const commentLines = lines.filter((l) => l.ref?.startsWith('c'));
+  assert.deepEqual(commentLines.map((l) => [l.text, l.ref]), [
+    ['- **A · The layers**', 'cA'],
+    ['- **A1 · Client**', 'cA1'],
+  ]);
+  // The remark of the same sub-panel carries the same board id, so the reply reads as one place.
+  assert.equal(lines.find((l) => l.ref === 'r0').text, '- **A1 · concern** "runs offline"');
+});
+
 test('reply: the drawn sheet marks each entry line so the preview can clear exactly that one', () => {
   const lines = replyLines({
     title: 'Cache', ui, decisions: [],

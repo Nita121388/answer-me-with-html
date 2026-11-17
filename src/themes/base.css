@@ -213,6 +213,8 @@ html[data-am-dragging] .am-panel--moving { opacity: .45; outline: 2px dashed var
 .am-panel--bare { position: relative; }
 .am-panel--bare > .am-comment-btn { position: absolute; top: 4px; inset-inline-end: 0; }
 .am-comment { padding: 0 14px 12px; }
+/* A sub-panel's comment box sits inside the parent's padded body, behind its own rail, so it takes less of its own. */
+.am-subpanel .am-comment { padding: 0 2px 10px; }
 .am-comment textarea, .am-reply textarea {
   width: 100%; font: var(--am-fs-text)/1.5 var(--font-sans); color: var(--ink); background: var(--paper);
   border: 1px solid var(--line-2); border-radius: var(--radius); padding: 8px 10px; resize: vertical;

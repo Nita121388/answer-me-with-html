@@ -196,3 +196,76 @@ test('nest: print opens every fold, sub-panels included, and nothing overflows s
   await sleep(400);
   assert.deepEqual(await errors(), []);
 });
+
+// A sub-panel is a board of its own, so the reader can comment on it instead of on the panel around it: the button sits in its
+// head, a press never folds it, the comment names the sub-panel in the reply, and the preview's ✕ drops only that one.
+test('nest: every sub-panel takes its own comment, and the reply names the sub-panel', { skip: SKIP, timeout: 60000 }, async () => {
+  await reset();
+  const counts = JSON.parse(await evaluate(`JSON.stringify({
+    buttons: document.querySelectorAll('.am-comment-btn').length,
+    boards: document.querySelectorAll('.am-panel, .am-subpanel').length,
+    inFold: !!document.querySelector('#panel-A2 .am-fold summary > .am-comment-btn'),
+    inPlain: !!document.querySelector('#panel-A3 > header.am-panel-head--sub > .am-comment-btn'),
+  })`));
+  assert.equal(counts.buttons, counts.boards, 'one button per board, panels and sub-panels alike');
+  assert.equal(counts.buttons, PARENTS + PARENTS * CHILDREN);
+  assert.equal(counts.inFold, true, 'a folded sub-panel takes the button in the head it folds by');
+  assert.equal(counts.inPlain, true, 'a plain sub-panel takes it in its header');
+
+  // A1 starts {collapsed}: pressing its comment button opens the box and leaves the fold closed, so the press is not a fold.
+  await evaluate(`document.querySelector('#panel-A1 .am-comment-btn').click()`);
+  await sleep(250);
+  const opened = JSON.parse(await evaluate(`JSON.stringify({
+    box: !document.querySelector('#panel-A1 > .am-comment').hidden,
+    fold: document.querySelector('#panel-A1 .am-fold').open,
+    focus: document.activeElement.tagName,
+  })`));
+  assert.equal(opened.box, true, 'the sub-panel comment box opened');
+  assert.equal(opened.fold, false, 'the press did not fold the sub-panel open');
+  assert.equal(opened.focus, 'TEXTAREA', 'focus went into the box');
+
+  // One comment on the panel and one on the sub-panel: the reply names each by the board the reader wrote it in.
+  await evaluate(`const boxA = document.querySelector('#panel-A > .am-comment textarea');
+    boxA.value = 'the panel note'; boxA.dispatchEvent(new Event('input', { bubbles: true }));
+    const boxA1 = document.querySelector('#panel-A1 > .am-comment textarea');
+    boxA1.value = 'split the client'; boxA1.dispatchEvent(new Event('input', { bubbles: true }));`);
+  await sleep(300);
+  await evaluate(`document.querySelector('[data-am="reply"]').click()`);
+  await sleep(350);
+  const shown = await evaluate(`document.querySelector('dialog.am-reply textarea').value`);
+  assert.ok(shown.includes('- **A · Panel 1**'), `the panel comment names the panel\n${shown}`);
+  assert.ok(shown.includes('- **A1 · Part 1**'), `the sub-panel comment names the sub-panel\n${shown}`);
+
+  // Both survive a reload, and the sub-panel's box comes back open with its button lit.
+  await open();
+  const after = JSON.parse(await evaluate(`JSON.stringify({
+    value: document.querySelector('#panel-A1 > .am-comment textarea').value,
+    open: !document.querySelector('#panel-A1 > .am-comment').hidden,
+    on: document.querySelector('#panel-A1 .am-comment-btn').classList.contains('am-comment-btn--on'),
+  })`));
+  assert.equal(after.value, 'split the client');
+  assert.equal(after.open, true, 'a saved sub-panel comment opens its box again');
+  assert.equal(after.on, true);
+
+  // The preview's ✕ drops the sub-panel entry only: its box empties, the panel's box and button stay as they were.
+  await evaluate(`document.querySelector('[data-am="reply"]').click()`);
+  await sleep(350);
+  await evaluate(`document.querySelector('dialog.am-reply .am-rv-entry[data-ref="cA1"] .am-rv-clear').click()`);
+  await sleep(350);
+  const cleared = JSON.parse(await evaluate(`JSON.stringify({
+    sub: document.querySelector('#panel-A1 > .am-comment textarea').value,
+    parent: document.querySelector('#panel-A > .am-comment textarea').value,
+    parentOn: document.querySelector('#panel-A .am-comment-btn').classList.contains('am-comment-btn--on'),
+    subOn: document.querySelector('#panel-A1 .am-comment-btn').classList.contains('am-comment-btn--on'),
+    raw: document.querySelector('dialog.am-reply textarea').value,
+  })`));
+  assert.equal(cleared.sub, '', 'the sub-panel box emptied');
+  assert.equal(cleared.parent, 'the panel note', 'the panel box keeps its own comment');
+  assert.equal(cleared.parentOn, true, 'the panel button stays lit');
+  assert.equal(cleared.subOn, false, 'the sub-panel button goes out');
+  assert.equal(cleared.raw.includes('split the client'), false, 'the copied text follows');
+  await evaluate(`document.querySelector('dialog.am-reply [data-act="close"]').click()`);
+  await sleep(200);
+  await evaluate('localStorage.clear()');
+  assert.deepEqual(await errors(), []);
+});

@@ -46,7 +46,8 @@ if (replyBtn) {
     if (document.visibilityState === 'hidden') flushSave();
   });
   window.addEventListener('pagehide', flushSave);
-  const panels = [...document.querySelectorAll('.am-panel')];
+  // A sub-panel is a board of its own ({nest}): it takes a comment button like a panel does, and its comment names it.
+  const panels = [...document.querySelectorAll('.am-panel, .am-subpanel')];
   const asks = [...document.querySelectorAll('.am-ask')];
   // Answers are saved by question text, so they still match after am patch has renumbered the asks.
   // Page text without the word joiners a right-to-left page puts after a Hebrew prefix hyphen (src/bidi.js): the reply and the saved
@@ -82,9 +83,11 @@ if (replyBtn) {
     if (serve) saveSoon({ reply: state });
   };
   const picked = (ask) => [...ask.querySelectorAll('input')].filter((i) => i.checked).map((i) => i.value);
+  // The nearest board: a panel or a sub-panel. An ask or a comment inside a sub-panel names that sub-panel (A1), not the
+  // panel around it (A) — the same board a remark names (src/runtime/remark.js, panelOf), so one reply speaks of one place.
   const panelOf = (el) => {
-    const panel = el.closest('.am-panel');
-    return { id: panel?.id.replace(/^panel-/, '') ?? '', title: textOf(panel?.querySelector('.am-panel-head h2')) ?? '' };
+    const panel = el.closest('.am-panel, .am-subpanel');
+    return { id: panel?.id.replace(/^panel-/, '') ?? '', title: textOf(panel?.querySelector('.am-panel-head :is(h2, h3)')) ?? '' };
   };
 
   const saved = load();
@@ -107,6 +110,8 @@ if (replyBtn) {
     ask.addEventListener('click', (e) => { if (e.target.matches('input')) answer(); });
   }
 
+  // Every board gets the button: the head of a panel (a summary when it folds) takes it, and the comment box hangs on the
+  // board itself, outside the <details>, so a folded board still shows the box and a click on the button never folds it.
   for (const panel of panels) {
     const id = panel.id.replace(/^panel-/, '');
     // An icon only: narrow panels have no room for a word next to the title.
@@ -180,7 +185,8 @@ if (replyBtn) {
       if (box) {
         box.value = '';
         box.dispatchEvent(new Event('input', { bubbles: true }));
-        const owner = box.closest('.am-panel')?.querySelector('.am-comment-btn');
+        // The nearest board's own button: a sub-panel comment must not light the panel's button above it.
+        const owner = box.closest('.am-panel, .am-subpanel')?.querySelector('.am-comment-btn');
         owner?.classList.remove('am-comment-btn--on');
       }
     } else if (ref.startsWith('r')) {
