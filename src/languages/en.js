@@ -6,7 +6,8 @@ export default {
   ui: {
     remark: {
       button: 'Remark', need: 'Pick a tag to save',
-      hint: 'Optional note', save: 'Save', remove: 'Remove', clear: 'Clear all remarks', clearConfirm: 'Click again to clear {n}',
+      hint: 'Optional note', save: 'Save',
+      cancel: 'Cancel', remove: 'Remove', clear: 'Clear all remarks', clearConfirm: 'Click again to clear {n}',
       section: 'Remarks',
       words: 'quote',
       kinds: { suggestion: 'suggestion', keep: 'keep', question: 'question', concern: 'concern' },

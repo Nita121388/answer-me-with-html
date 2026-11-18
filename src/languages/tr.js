@@ -7,7 +7,8 @@ export default {
   ui: {
     remark: {
       button: 'İşaretle', need: 'Kaydetmek için bir etiket seçin',
-      hint: 'İsteğe bağlı not', save: 'Kaydet', remove: 'Kaldır', clear: 'Tüm işaretleri temizle', clearConfirm: '{n} işareti temizlemek için tekrar tıklayın',
+      hint: 'İsteğe bağlı not', save: 'Kaydet',
+      cancel: 'İptal', remove: 'Kaldır', clear: 'Tüm işaretleri temizle', clearConfirm: '{n} işareti temizlemek için tekrar tıklayın',
       section: 'İşaretler',
       words: 'alıntı',
       kinds: { suggestion: 'öneri', keep: 'kalsın', question: 'soru', concern: 'endişe' },

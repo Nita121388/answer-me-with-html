@@ -14,7 +14,8 @@ export default {
   ui: {
     remark: {
       button: '注記', need: '保存するにはタグを選択',
-      hint: 'メモ（任意）', save: '保存', remove: '削除', clear: '注記をすべて消去', clearConfirm: 'もう一度クリックして {n} 件の注記を消去',
+      hint: 'メモ（任意）', save: '保存',
+      cancel: 'キャンセル', remove: '削除', clear: '注記をすべて消去', clearConfirm: 'もう一度クリックして {n} 件の注記を消去',
       section: '注記',
       words: '引用',
       kinds: { suggestion: '提案', keep: '維持', question: '質問', concern: '懸念' },

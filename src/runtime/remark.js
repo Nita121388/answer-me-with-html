@@ -468,6 +468,16 @@
     noteIn.value = '';
     showClear();
   };
+  // The float closes without the reader pressing Enter, so a note is saved whenever the words are left behind — a click on the
+  // page, a scroll, a new selection — and Escape is the one way out that keeps the page as it was. An empty box on a mark that had
+  // a note takes the note off; a mark with nothing in it never started.
+  const commitFloat = () => {
+    if (float.hidden) return;
+    const note = noteIn.value.trim();
+    if (note) return saveAnnot();
+    if (editing?.note) return dropAnnot();
+    hideFloat();
+  };
   const placeFloat = (rect) => {
     const rtl = getComputedStyle(document.documentElement).direction === 'rtl';
     const w = float.offsetWidth;
@@ -480,27 +490,34 @@
     float.style.left = `${window.scrollX + x}px`;
     float.style.top = `${window.scrollY + y}px`;
   };
+  // What a live selection points at: the one block it covers and its offsets in that block's page text, or null when it covers
+  // nothing this page can mark (no selection, two blocks, a formula, only whitespace).
+  const pickOf = (range) => {
+    const blockOf = (node) => blockAt(node.nodeType === 3 ? node.parentElement : node);
+    const el = blockOf(range.startContainer);
+    if (!el || el !== blockOf(range.endContainer)) return null;
+    const offsets = offsetsOf(el, range);
+    if (!offsets) return null;
+    if (!blockText(el).slice(offsets[0], offsets[1]).trim()) return null;
+    return { el, start: offsets[0], end: offsets[1] };
+  };
   const showFloat = () => {
     if (btn.getAttribute('aria-pressed') !== 'true') return hideFloat();
     const selection = window.getSelection();
-    if (!selection || selection.isCollapsed || selection.rangeCount !== 1) return hideFloat();
-    const range = selection.getRangeAt(0);
-    const blockOf = (node) => blockAt(node.nodeType === 3 ? node.parentElement : node);
-    const el = blockOf(range.startContainer);
-    if (!el || el !== blockOf(range.endContainer)) return hideFloat();
-    const offsets = offsetsOf(el, range);
-    if (!offsets) return hideFloat();
-    // The words as the block reads them, verbatim: relocate compares them with the same text after a render.
-    const words = blockText(el).slice(offsets[0], offsets[1]);
-    if (!words.trim()) return hideFloat();
-    picked = { el, start: offsets[0], end: offsets[1] };
+    const range = selection && !selection.isCollapsed && selection.rangeCount === 1 ? selection.getRangeAt(0) : null;
+    const rect = range?.getBoundingClientRect();
+    const next = range && pickOf(range);
+    // The note typed on the old pick is saved before the new selection takes the float: moving on is how a reader saves without Enter.
+    if (!float.hidden && picked && noteIn.value.trim()) saveAnnot(true);
+    if (!next) return commitFloat();
+    picked = next;
     // The mark under the selection, if there is one: each mark of this block is asked where it sits on the page now, so a mark whose
     // text moved still matches its own words, and a selection on other words matches nothing (and starts a mark of its own). This is
     // the one place a record is matched to a range, so a click on marked words and a hand selection of the same words agree.
-    editing = recordAt(el, picked.start, picked.end);
+    editing = recordAt(next.el, next.start, next.end);
     noteIn.value = editing?.note ?? '';
     float.hidden = false;
-    placeFloat(range.getBoundingClientRect());
+    placeFloat(rect);
   };
   // The text mark of this block that covers exactly [start, end) of the block's page text.
   const recordAt = (el, start, end) => {
@@ -513,7 +530,7 @@
     }
     return null;
   };
-  const saveAnnot = () => {
+  const saveAnnot = (keepSelection = false) => {
     if (!picked) return;
     const key = keyMap().get(picked.el);
     if (typeof key !== 'string') return hideFloat();
@@ -540,7 +557,7 @@
     hideFloat();
     save();
     paintAllAnnots();
-    window.getSelection()?.removeAllRanges();
+    if (!keepSelection) window.getSelection()?.removeAllRanges();
   };
   const dropAnnot = () => {
     if (!editing) return;
@@ -550,7 +567,17 @@
     paintAllAnnots();
     window.getSelection()?.removeAllRanges();
   };
-  float.append(noteIn);
+  // The key hint every note box shows: Enter saves, Escape cancels, and a click on the page saves too.
+  const keyHint = () => {
+    const row = document.createElement('span');
+    row.className = 'am-remark-keys';
+    row.setAttribute('aria-hidden', 'true');
+    const key = (text) => Object.assign(document.createElement('kbd'), { textContent: text });
+    const word = (text) => Object.assign(document.createElement('span'), { textContent: text });
+    row.append(key('Enter'), word(ui.save ?? 'Save'), key('Esc'), word(ui.cancel ?? 'Cancel'));
+    return row;
+  };
+  float.append(noteIn, keyHint());
   document.body.append(float);
   // A press inside the float keeps the selection; only the box takes the focus, so a note can be typed.
   float.addEventListener('pointerdown', (e) => { if (e.target !== noteIn) e.preventDefault(); });
@@ -602,9 +629,15 @@
   document.body.append(pop);
   let opener = null;
   let anchor = null;
-  const close = (restoreFocus) => {
+  // Saves what the popover holds. The popover closes for any reason but Escape — Enter, a click on the page, a Tab away — and the
+  // note is saved by that closing, so the reader never has to press Enter.
+  let popSave = null;
+  const close = (restoreFocus, cancel = false) => {
     if (pop.hidden) return;
+    const commit = popSave;
+    popSave = null;
     pop.hidden = true;
+    if (!cancel) commit?.();
     if (restoreFocus) (opener?.isConnected && opener !== document.body ? opener : btn).focus();
   };
   const place = () => {
@@ -624,24 +657,32 @@
     anchor = el;
     const input = make('input', { type: 'text', value: mark?.note ?? '' });
     input.setAttribute('aria-label', ui.hint);
-    input.addEventListener('keydown', (e) => {
-      if (e.key !== 'Enter' || e.isComposing) return;
-      e.preventDefault();
+    // The input is all the mark says: what it holds when the popover closes is saved. An emptied box on a mark that had a note
+    // takes the note off; a plain block with nothing typed gets no mark.
+    const apply = () => {
       const note = input.value.trim();
       if (note) {
         const saved = { key, kind: mark?.kind ?? '', note };
         marks.set(key, saved);
         save();
         paint(el, saved);
-      } else if (mark) {
-        // The input holds all the mark says: emptied, the mark goes with it.
+      } else if (mark?.note) {
         marks.delete(key);
         save();
         unpaint(el);
       }
+    };
+    popSave = apply;
+    input.addEventListener('keydown', (e) => {
+      if (e.key !== 'Enter' || e.isComposing) return;
+      e.preventDefault();
       close(true);
     });
-    pop.replaceChildren(input);
+    // Tab leaves the input and the popover with it, and the note is saved on the way out.
+    input.addEventListener('blur', () => {
+      if (!pop.hidden) close(false);
+    });
+    pop.replaceChildren(input, keyHint());
     pop.hidden = false;
     place();
     input.focus({ preventScroll: true });
@@ -722,22 +763,23 @@
     if (!on) {
       track({ type: 'mouseout', relatedTarget: null });
       hideFloat();
-      close(false);
+      close(false, true);
     }
   };
   btn.addEventListener('click', () => setMode(btn.getAttribute('aria-pressed') !== 'true'));
   document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') close(true);
+    if (e.key === 'Escape') close(true, true);
   });
-  // A click outside the popover closes it; the same click may then start another mark.
+  // A click outside the popover closes it and saves what it holds; the same click may then start another mark.
   document.addEventListener('click', (e) => {
     if (!pop.hidden && !pop.contains(e.target)) close(false);
   }, true);
   // The float is placed against the words, so a scroll or a new width could leave it lying about a line it no longer covers. It
-  // goes instead, unless the reader is typing a note: a note under the pointer is worth more than a float in the right place.
+  // goes instead — with what was typed — unless the reader is typing a note: a note under the pointer is worth more than a float in
+  // the right place.
   const typing = () => float.contains(document.activeElement) && document.activeElement === noteIn;
-  window.addEventListener('scroll', () => { if (!float.hidden && !typing()) hideFloat(); }, { passive: true });
-  window.addEventListener('resize', () => { if (!float.hidden && !typing()) hideFloat(); });
+  window.addEventListener('scroll', () => { if (!float.hidden && !typing()) commitFloat(); }, { passive: true });
+  window.addEventListener('resize', () => { if (!float.hidden && !typing()) commitFloat(); });
   setMode(false);
 
   // What the Reply button reads: the marked blocks and the marked words that are on the page, in page order. Each entry carries the

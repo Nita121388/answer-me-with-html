@@ -139,8 +139,23 @@ test('remark: adding a note keeps the kind a mark already had, and the mark unde
   assert.match(RUNTIME_JS, /kind: mark\?\.kind \?\? '',/);
   // The mark a selection edits is the one that covers exactly those words now, so a mark that moved is still found and a selection
   // on other words matches nothing (and starts a mark of its own) instead of replacing the mark the reader had clicked.
-  assert.match(RUNTIME_JS, /editing = recordAt\(el, picked\.start, picked\.end\);/);
+  assert.match(RUNTIME_JS, /editing = recordAt\(next\.el, next\.start, next\.end\);/);
   assert.doesNotMatch(RUNTIME_JS, /reopened/, 'no stale reopened record can outlive the selection that named it');
+});
+
+test('remark: a note is saved when its box closes for any reason but Escape', () => {
+  // The word float: a click on the page, a scroll or a new selection commits what was typed.
+  assert.match(RUNTIME_JS, /const commitFloat = \(\) => \{/);
+  assert.match(RUNTIME_JS, /window\.addEventListener\('scroll', \(\) => \{ if \(!float\.hidden && !typing\(\)\) commitFloat\(\); \}, \{ passive: true \}\);/);
+  assert.match(RUNTIME_JS, /if \(!float\.hidden && picked && noteIn\.value\.trim\(\)\) saveAnnot\(true\);/);
+  // The block popover: Enter, a click outside and a Tab away all save what the input holds.
+  assert.match(RUNTIME_JS, /if \(!cancel\) commit\?\.\(\);/);
+  assert.match(RUNTIME_JS, /input\.addEventListener\('blur', \(\) => \{\n      if \(!pop\.hidden\) close\(false\);\n    \}\);/);
+  // Escape is the one way out that keeps the page as it was.
+  assert.match(RUNTIME_JS, /if \(e\.key === 'Escape'\) close\(true, true\);/);
+  // Both boxes say so with a key hint: Enter saves, Escape cancels.
+  assert.match(RUNTIME_JS, /row\.append\(key\('Enter'\), word\(ui\.save \?\? 'Save'\), key\('Esc'\), word\(ui\.cancel \?\? 'Cancel'\)\);/);
+  assert.match(RUNTIME_JS, /pop\.replaceChildren\(input, keyHint\(\)\);/);
 });
 
 test('remark: the reply sheet can drop one mark, and a code block copies its code without the mark numbers', () => {
