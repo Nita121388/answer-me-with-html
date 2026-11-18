@@ -1,28 +1,33 @@
 {
-  "version": "0.5.11",
+  "version": "0.6.1",
   "en": [
-    "One button folds every panel, then opens every panel",
-    "Marking words no longer loses a mark or nests one inside another",
-    "The Reply preview drops one comment or one mark with a ✕"
+    "New diagrams: state machines, UML classes and HTTP/RPC contracts",
+    "Copy as image puts the page on the clipboard; pages_dir picks the folder",
+    "am video --voice cmd narrates with edge-tts, piper or another CLI TTS"
   ],
   "zh": [
-    "一个按钮全部折叠，再点一下全部展开",
-    "文字标注不再丢标注、也不再互相嵌套",
-    "回复预览里可以用 ✕ 单独去掉一条评论或一条标注"
+    "新增图表：状态机、UML 类图和 HTTP/RPC 接口契约",
+    "「复制为图片」把整页放进剪贴板；pages_dir 指定页面输出目录",
+    "am video --voice cmd 用 edge-tts、piper 等命令行 TTS 配音"
   ],
   "zh-Hant": [
-    "一個按鈕全部摺疊，再點一下全部展開",
-    "文字標註不再遺失標註、也不再互相巢狀",
-    "回覆預覽裡可以用 ✕ 單獨移除一則評論或一處標註"
+    "新增圖表：狀態機、UML 類別圖和 HTTP/RPC 介面契約",
+    "「複製為圖片」把整頁放進剪貼簿；pages_dir 指定頁面輸出資料夾",
+    "am video --voice cmd 用 edge-tts、piper 等命令列 TTS 配音"
   ],
   "ja": [
-    "ボタン1つですべて折りたたみ、もう一度で全開",
-    "文字の注記が消えたり入れ子になったりしなくなりました",
-    "返信プレビューで ✕ を押すと1件だけ削除できます"
+    "新しい図：状態遷移図、UML クラス図、HTTP/RPC の API 仕様",
+    "「画像としてコピー」でページをクリップボードへ。出力先は pages_dir",
+    "am video --voice cmd で edge-tts や piper などのコマンド TTS が使えます"
   ],
   "he": [
-    "כפתור אחד מקפל את כל הפאנלים, ועוד לחיצה פותחת הכול",
-    "סימון מילים לא מאבד סימון ולא מקנן אחד בתוך השני",
-    "בתצוגה המקדימה של התגובה אפשר להסיר פריט אחד ב-✕"
+    "דיאגרמות חדשות: מכונות מצבים, מחלקות UML וחוזי HTTP/RPC",
+    "העתקה כתמונה שמה את העמוד בלוח; pages_dir קובע את התיקייה",
+    "am video --voice cmd מקריא עם edge-tts, piper או TTS אחר משורת הפקודה"
+  ],
+  "tr": [
+    "Yeni diyagramlar: durum makineleri, UML sınıfları, HTTP/RPC sözleşmeleri",
+    "Görsel olarak kopyala sayfayı panoya alır; klasörü pages_dir seçer",
+    "am video --voice cmd; edge-tts, piper gibi komut satırı TTS ile seslendirir"
   ]
 }

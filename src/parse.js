@@ -3,6 +3,7 @@
 
 import { themeNames, AUTO } from './themes/registry.js';
 import { COMPONENTS } from './components/index.js';
+import { previewEnd } from './components/ask.js';
 import { parseAttrs, coerce, unquote } from './attrs.js';
 
 export { parseAttrs };
@@ -54,7 +55,7 @@ export function applyOverrides(meta, overrides, choices = CHOICES) {
 }
 
 // Allowed voice-over values for video narration (shared by config voice and am video --voice).
-export const VOICES = Object.freeze(['auto', 'elevenlabs', 'local', 'system', 'off']);
+export const VOICES = Object.freeze(['auto', 'elevenlabs', 'local', 'cmd', 'system', 'off']);
 
 const DEFAULT_META = Object.freeze({
   template: 'sheet',
@@ -98,13 +99,34 @@ export function parseDoc(source, options) {
 // caller can add what it finds later (renderDoc adds the component errors). Other errors still throw at once, since nothing
 // sensible follows them (frontmatter, an unclosed fence, a duplicate panel ID).
 export function parseDocLoose(source, { defaults = {}, choices = {} } = {}) {
-  const lines = String(source).replace(/^\uFEFF/, '').replace(/\r\n?/g, '\n').split('\n');
+  const lines = sourceLines(source);
   const { meta, bodyStart } = parseFrontmatter(lines, { ...DEFAULT_META, ...defaults }, { ...CHOICES, ...choices });
   const errors = [];
   const sections = splitSections(lines, bodyStart, errors);
   const intro = extractTitle(sections.intro, meta);
   const panels = assignIds(sections.panels);
   return { doc: { meta, intro, panels }, errors };
+}
+
+const sourceLines = (source) => String(source).replace(/^\uFEFF/, '').replace(/\r\n?/g, '\n').split('\n');
+
+// A key is letters of any script (a Hebrew or Chinese key such as `עודכן` shows in the meta row as written), digits, _ and -,
+// and may hold single spaces between words.
+const FRONT_ENTRY = /^([\p{L}\p{M}\p{N}_-]+(?: [\p{L}\p{M}\p{N}_-]+)*)\s*:\s*(.*)$/u;
+
+// One front matter value read by the rules of parseFrontmatter (comments stripped, the last entry wins), or undefined. It never
+// throws: a malformed line is skipped and an unclosed block gives undefined, so a draft that does not parse can still be named.
+export function frontmatterValue(source, key) {
+  const lines = sourceLines(source);
+  if (lines[0]?.trim() !== '---') return undefined;
+  const end = lines.findIndex((l, i) => i > 0 && l.trim() === '---');
+  if (end === -1) return undefined;
+  let value;
+  for (const line of lines.slice(1, end)) {
+    const m = stripLineComment(line).trim().match(FRONT_ENTRY);
+    if (m?.[1] === key) value = unquote(m[2]);
+  }
+  return value;
 }
 
 function parseFrontmatter(lines, base, allowed) {
@@ -116,9 +138,7 @@ function parseFrontmatter(lines, base, allowed) {
   for (let i = 1; i < end; i++) {
     const raw = stripLineComment(lines[i]).trim();
     if (!raw || raw.startsWith('#')) continue;
-    // A key is letters of any script (a Hebrew or Chinese key such as `עודכן` shows in the meta row as written), digits, _ and -,
-    // and may hold single spaces between words.
-    const m = raw.match(/^([\p{L}\p{M}\p{N}_-]+(?: [\p{L}\p{M}\p{N}_-]+)*)\s*:\s*(.*)$/u);
+    const m = raw.match(FRONT_ENTRY);
     if (!m) throw new ParseError(`Cannot parse frontmatter line "${lines[i]}"; expected key: value`, i + 1);
     entries[m[1]] = { value: coerce(m[1], unquote(m[2])), line: i + 1 };
   }
@@ -166,7 +186,7 @@ function splitSections(lines, start, errors) {
     const colonName = colon?.[2].toLowerCase();
     if (colon && COMPONENTS.has(colonName)) {
       flushMd();
-      const close = lines.findIndex((l, k) => k > i && l.match(COLON_CLOSE)?.[1].length >= colon[1].length);
+      const close = findColonClose(lines, i, colon[1], colonName);
       if (close === -1) throw new ParseError(`fenced block ${colon[1]}${colon[2]} is not closed`, i + 1);
       current.blocks.push({ type: 'fence', lang: colonName, args: (colon[3] ?? '').trim(), text: lines.slice(i + 1, close).join('\n'), line: i + 1 });
       i = close;
@@ -276,6 +296,54 @@ function checkTables(lines, first) {
     }
     return [];
   });
+}
+
+const FENCE_MARK = /^ {0,3}(`{3,}|~{3,})/;
+
+/** The close line of a code fence that opens at openIdx, or -1. */
+function fenceClose(lines, openIdx, mark) {
+  for (let k = openIdx + 1; k < lines.length; k++) {
+    const end = lines[k].match(FENCE_MARK)?.[1];
+    if (end && end[0] === mark[0] && end.length >= mark.length && !lines[k].trim().slice(end.length)) return k;
+  }
+  return -1;
+}
+
+/**
+ * The close of a `:::` block. A block may hold another one, as an ask preview does, so nested opens and closes balance before the
+ * outer close; a ``` fence inside the block hides its `:::` lines from the count, like it does at the top level. A lone ``` line
+ * with no close stays text, as it did before blocks could nest. Inside an ask block a preview is opaque: its raw html or svg may
+ * write `:::` lines, and ask's own preview rule (the next bare `:::` at the same indent) is what ends it.
+ */
+function findColonClose(lines, openIdx, marker, name) {
+  const stack = [marker.length];
+  for (let j = openIdx + 1; j < lines.length; j++) {
+    if (name === 'ask') {
+      const end = previewEnd(lines, j);
+      if (end !== -1) {
+        j = end;
+        continue;
+      }
+    }
+    const line = lines[j];
+    const mark = line.match(FENCE_MARK)?.[1];
+    if (mark) {
+      const close = fenceClose(lines, j, mark);
+      if (close === -1) continue;
+      j = close;
+      continue;
+    }
+    const open = line.match(COLON_OPEN);
+    if (open) {
+      stack.push(open[1].length);
+      continue;
+    }
+    const close = line.match(COLON_CLOSE);
+    if (!close || close[1].length < stack[stack.length - 1]) continue;
+    stack.pop();
+    if (!stack.length) return j;
+  }
+  return -1;
 }
 
 function findFenceClose(lines, openIdx, marker) {

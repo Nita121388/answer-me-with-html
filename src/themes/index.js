@@ -2,7 +2,7 @@
 // Component styles (base.css, video.css) reference only variables; a theme's decoration css is scoped to its own root selector.
 // Each theme provides light / dark values; auto mode follows the system prefers-color-scheme.
 
-import { BASE_CSS, DIFF_CSS, DELTA_CSS, RTL_CSS, CHART_CSS, CANVAS_CSS, MATH_CSS, FONT_CSS, VIDEO_CSS, UPDATE_CSS, CLOSE_AFTER_CSS } from '../assets.js';
+import { BASE_CSS, TABLE_CSS, DIFF_CSS, DELTA_CSS, RTL_CSS, CHART_CSS, CANVAS_CSS, MATH_CSS, FONT_CSS, VIDEO_CSS, UPDATE_CSS, CLOSE_AFTER_CSS } from '../assets.js';
 import { themes } from './registry.js';
 import { fontLanguages, langSelector } from './fonts.js';
 import { typeScaleCss } from './type-scale.js';
@@ -10,10 +10,17 @@ import { typeScaleCss } from './type-scale.js';
 const block = (selector, vars) =>
   `${selector} {\n${Object.entries(vars).map(([k, v]) => `  ${k}: ${v};`).join('\n')}\n}`;
 
-function tokenCss(sel, { common = {}, light = {}, dark = {} }) {
-  const parts = [block(`${sel}, ${sel}[data-mode="light"]`, { ...common, ...light })];
+function tokenCss(sel, { common = {}, light = {}, dark = {} }, fixedMode) {
+  // Each mode block also sets color-scheme (#395): it tells the browser which native UI (scrollbar, form controls) to draw.
+  // auto says "light dark" outside the media query, so the browser follows the system the way the tokens below follow the query.
+  const baseScheme = fixedMode === 'dark' ? 'dark' : 'light';
+  const parts = [
+    block(`${sel}, ${sel}[data-mode="light"]`, { 'color-scheme': baseScheme, ...common, ...light }),
+    block(`${sel}[data-mode="dark"]`, { 'color-scheme': 'dark', ...dark }),
+    block(`${sel}[data-mode="auto"]`, { 'color-scheme': 'light dark' }),
+  ];
   if (Object.keys(dark).length) {
-    parts.push(block(`${sel}[data-mode="dark"]`, dark), `@media (prefers-color-scheme: dark) {\n${block(`${sel}[data-mode="auto"]`, dark)}\n}`);
+    parts.push(`@media (prefers-color-scheme: dark) {\n${block(`${sel}[data-mode="auto"]`, dark)}\n}`);
   }
   return parts.join('\n');
 }
@@ -32,16 +39,17 @@ const ownLanguageFont = (t) => fontLanguages().map((l) => block(langSelector(l, 
 // list: the page themes the page carries (default: the built-in ones). diff: the page has a diff block, delta: a diagram with change markers;
 // their styles come with the base ones. rtl: the page language is written right to left. base.css already uses logical properties;
 // rtl.css holds only what they cannot express (code stays left to right, label fonts, mirrored offsets). math: the page has a formula (src/math.js);
-// it carries the Temml styles with their font, about 20 KB, so a page without math does not. chart: the page has a chart (src/components/chart.js); it carries chart.css. update: the page has the new-version button;
+// it carries the Temml styles with their font, about 20 KB, so a page without math does not. chart: the page has a chart (src/components/chart.js); it carries chart.css.
+// table: a Markdown table opted in to sort / filter, so its controls and print rules come with it. update: the page has the new-version button;
 // closeAfter: the page closes its tab after the reply is copied (the close_after_reply setting). fonts: every theme in list that names a
 // shipped font (`font`) brings its face, one copy per font, so the picker can switch to it; a page that carries no such theme stays
 // as small as before. A video page turns fonts off, because its player never switches theme.
 // scale: the reader's text size. It sets --am-scale after the type scale (src/themes/type-scale.js), which every page size multiplies; 1 adds nothing.
-export function pageCss(list = themes('page'), { diff = false, delta = false, rtl = false, math = false, chart = false, canvas = false, update = false, closeAfter = false, fonts = true, scale = 1 } = {}) {
+export function pageCss(list = themes('page'), { diff = false, delta = false, rtl = false, math = false, chart = false, canvas = false, table = false, update = false, closeAfter = false, fonts = true, scale = 1 } = {}) {
   const decorations = list.filter((t) => t.css).map((t) => scoped(t.css, pageSel(t)));
   const fontFaces = fonts ? [...new Set(list.map((t) => t.font).filter((f) => f && FONT_CSS[f]))].map((f) => FONT_CSS[f]) : [];
   const ownFonts = list.filter((t) => t.ownFont).flatMap(ownLanguageFont);
-  return [list.map((t) => tokenCss(pageSel(t), t.tokens)).join('\n\n'), ...languageFontCss(), ...ownFonts, typeScaleCss(), ...(scale === 1 ? [] : [`html { --am-scale: ${scale}; }`]), BASE_CSS, ...(math ? [MATH_CSS] : []), ...(chart ? [CHART_CSS] : []), ...(canvas ? [CANVAS_CSS] : []), ...(diff ? [DIFF_CSS] : []), ...(delta ? [DELTA_CSS] : []), ...(update ? [UPDATE_CSS] : []), ...(closeAfter ? [CLOSE_AFTER_CSS] : []), ...(rtl ? [RTL_CSS] : []), ...fontFaces, ...decorations].join('\n\n');
+  return [list.map((t) => tokenCss(pageSel(t), t.tokens, t.mode)).join('\n\n'), ...languageFontCss(), ...ownFonts, typeScaleCss(), ...(scale === 1 ? [] : [`html { --am-scale: ${scale}; }`]), BASE_CSS, ...(math ? [MATH_CSS] : []), ...(chart ? [CHART_CSS] : []), ...(canvas ? [CANVAS_CSS] : []), ...(table ? [TABLE_CSS] : []), ...(diff ? [DIFF_CSS] : []), ...(delta ? [DELTA_CSS] : []), ...(update ? [UPDATE_CSS] : []), ...(closeAfter ? [CLOSE_AFTER_CSS] : []), ...(rtl ? [RTL_CSS] : []), ...fontFaces, ...decorations].join('\n\n');
 }
 
 // list: the video themes the player carries (default: the built-in ones). rtl: the video language is written right to left; the page
@@ -49,7 +57,7 @@ export function pageCss(list = themes('page'), { diff = false, delta = false, rt
 // The player has no theme picker, so its page styles carry no font face (pageCss fonts: false).
 export function videoCss(list = themes('video'), { diff = false, delta = false, rtl = false, chart = false } = {}) {
   const parts = list.filter((t) => t.video).flatMap((t) => [
-    t.video.tokens ? tokenCss(videoSel(t), t.video.tokens) : '',
+    t.video.tokens ? tokenCss(videoSel(t), t.video.tokens, t.mode) : '',
     t.video.css ? scoped(t.video.css, videoSel(t)) : '',
     rtl && t.video.rtlCss ? scoped(t.video.rtlCss, videoSel(t)) : '',
   ]).filter(Boolean);

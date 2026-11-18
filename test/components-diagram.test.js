@@ -61,6 +61,14 @@ test('sequence: the num argument adds step numbers', () => {
   assert.match(render('sequence', 'A -> B: x', 'num'), /class="am-step"[^>]*>1<\/text>/);
 });
 
+test('sequence: a two-digit step number gets more room than a one-digit one, so it does not run into a centred label', () => {
+  const msgs = (k) => Array.from({ length: k }, () => 'A -> B: x').join('\n');
+  // Nine messages need no more room than one; the tenth widens the gap by the extra digit on both sides of the label.
+  assert.equal(viewBox(render('sequence', msgs(9), 'num'))[0], viewBox(render('sequence', msgs(1), 'num'))[0]);
+  const long = `A -> B: ${'x'.repeat(30)}`;
+  assert.ok(viewBox(render('sequence', `${msgs(8)}\n${long}\nA -> B: x`, 'num'))[0] < viewBox(render('sequence', `${msgs(9)}\n${long}`, 'num'))[0]);
+});
+
 test('sequence: an unparseable line reports its line number', () => {
   throwsAt(() => render('sequence', 'A -> B: ok\nA => B'), 2);
 });
@@ -116,6 +124,35 @@ test('flow: an edge routed around the outside keeps the margin inside the drawin
       assert.ok(x >= 14 && x <= w - 14 && y >= 14 && y <= h - 14, `${dir}: ${x},${y} outside ${w}x${h}`);
     }
   }
+});
+
+// How many pairs of drawn edges cross, read from the bends of their paths. Two edges that only touch at a shared node do not count.
+const crossings = (svg, edges) => {
+  const lines = [...svg.matchAll(/class="am-edge[^"]*" d="([^"]+)"/g)].map((m) => [...m[1].matchAll(/(-?[\d.]+),(-?[\d.]+)/g)].map(([, x, y]) => [+x, +y]));
+  assert.equal(lines.length, edges, 'drawn edges');
+  const side = ([ax, ay], [bx, by], [cx, cy]) => Math.sign((bx - ax) * (cy - ay) - (by - ay) * (cx - ax));
+  const cross = ([a, b], [c, d]) => side(a, b, c) * side(a, b, d) < 0 && side(c, d, a) * side(c, d, b) < 0;
+  const segments = (line) => line.slice(1).map((p, i) => [line[i], p]);
+  return lines.flatMap((a, i) => lines.slice(i + 1).filter((b) => segments(a).some((s) => segments(b).some((t) => cross(s, t))))).length;
+};
+
+test('flow: two edges from one node keep the order of the nodes they end at', () => {
+  // dagre ties the edges from Q to M and to Y and keeps the order of the draft, so they crossed although nothing forces them to.
+  const src = 'P -> M\nQ -> M\nP -> X\nQ -> Y\nX -> Z\nY -> Z';
+  for (const dir of ['LR', 'RL', 'TB', 'BT']) assert.equal(crossings(render('flow', src, dir), 6), 0, dir);
+});
+
+test('flow: edges inside a group keep the order of the nodes they end at too', () => {
+  // The order of these lines matters: dagre then leaves a crossing that one swap removes. Other orders can need two moves at once.
+  const src = 'P -> X\nP -> M\nQ -> M\nQ -> Y\nY -> Z\nX -> Z\ngroup G: P, Q, M, X, Y, Z';
+  for (const dir of ['LR', 'RL', 'TB', 'BT']) assert.equal(crossings(render('flow', src, dir), 6), 0, dir);
+});
+
+test('flow: a node at the end of a long edge changes places together with the points of that edge', () => {
+  // B and E point at each other, so the edges from B to its other ends are two ranks long. The edge from F to E crossed the one
+  // from B to G: no single swap removes that crossing, G and the middle point of its edge must both move.
+  const src = 'A -> B\nB -> C\nC -> B\nB -> D\nB -> E\nF -> E\nE -> B\nB -> G';
+  for (const dir of ['LR', 'RL', 'TB', 'BT']) assert.equal(crossings(render('flow', src, dir), 8), 0, dir);
 });
 
 test('flow: diamond nodes draw as a polygon, databases as a cylinder', () => {
@@ -462,6 +499,11 @@ test('er: a FK field implies the many-to-one relationship, and a written line re
   const replaced = relationships(parseEr('Order\n  user_id FK -> User\nUser\n  id PK\nUser 1--* Order: places'));
   assert.equal(replaced.length, 1);
   assert.deepEqual([replaced[0].from, replaced[0].to, replaced[0].label], ['User', 'Order', 'places']);
+});
+
+test('er: two relationships from one entity keep the order of the entities they end at', () => {
+  const src = 'P\nQ\nM\nX\nY\nZ\nP 1--* M\nQ 1--* M\nP 1--* X\nQ 1--* Y\nX 1--* Z\nY 1--* Z';
+  for (const dir of ['LR', 'RL', 'TB', 'BT']) assert.equal(crossings(render('er', src, dir), 6), 0, dir);
 });
 
 test('er: draws a box per entity with its fields, and an end per cardinality', () => {

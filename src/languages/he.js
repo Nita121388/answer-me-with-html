@@ -24,6 +24,7 @@ export default {
     fold: { collapse: 'קיפול הכול', expand: 'פתיחת הכול' },
     move: 'הזזת פאנל', resetOrder: 'שחזור הסדר המקורי',
     canvas: { zoomIn: 'הגדלה', zoomOut: 'הקטנה', fit: 'התאמה', reset: 'איפוס', linkFrom: 'קישור מהפאנל הזה', copyEdges: 'העתקת קישורים', drawio: 'יצוא drawio' , fullscreen: 'מסך מלא', exitFullscreen: 'יציאה ממסך מלא'},
+    copyImage: { button: 'העתקה כתמונה', working: 'יוצר תמונה…', done: 'הועתק ✓', downloaded: 'הורד', failed: 'ההעתקה נכשלה' },
     copy: 'העתקת המקור', done: 'הועתק ✓', copyCode: 'העתקה',
     update: { button: 'גרסה חדשה {version}', current: 'הגרסה שלכם {current}. הגרסה החדשה נמצאה כשהדף נוצר.', whatsNew: 'מה חדש בגרסה:', run: 'הריצו בטרמינל:', agent: 'או בקשו מה-Agent:', agentText: 'עדכן את answer-me-with-html', notes: 'מה חדש' },
     live: { updated: 'הדף עודכן', reload: 'רענון' },
@@ -37,11 +38,13 @@ export default {
       count: { answered: 'נענו: {n}', comments: 'הערות: {n}', remarks: 'סימונים: {n}' },
     },
     closeAfter: { closing: 'הלשונית תיסגר בעוד {n} שניות', keep: 'להשאיר פתוחה', closeFailed: 'התגובה הועתקה. אפשר לסגור את הלשונית.' },
-    toc: 'תוכן העניינים', flow: 'תרשים זרימה', sequence: 'תרשים רצף', er: 'תרשים ישויות וקשרים', colon: ': ', sep: ', ',
+    toc: 'תוכן העניינים', flow: 'תרשים זרימה', state: 'תרשים מצבים', sequence: 'תרשים רצף', er: 'תרשים ישויות וקשרים', class: 'תרשים מחלקות', colon: ': ', sep: ', ',
     expand: 'הגדלת התרשים', close: 'סגירה', diagram: 'מציג התרשים', expandImage: 'הגדלת תמונה', image: 'מציג תמונה',
     delta: { added: 'נוסף', removed: 'הוסר', changed: 'שונה', view: 'תצוגה', before: 'לפני', changes: 'שינויים', after: 'אחרי' },
     generated: 'נוצר באמצעות', limits: { value: '{value} מתוך {limit}', limit: 'עד {limit}' },
     chart: { name: 'תרשים', data: 'נתונים', value: 'ערך', share: 'חלק' },
+    api: { path: 'פרמטרים בנתיב', query: 'פרמטרים בשאילתה', headers: 'כותרות', request: 'בקשה', response: 'תגובה', field: 'שדה', type: 'טיפוס', description: 'תיאור', requirement: 'דרישה', required: 'חובה', optional: 'רשות' },
+    table: { filter: 'סינון הטבלה' },
   },
   // Names for the frontmatter keys an agent writes most (`author: …`), shown under the title. Other keys show as written.
   metaKeys: {

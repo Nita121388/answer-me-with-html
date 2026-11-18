@@ -98,18 +98,19 @@ test('render: the header has title, subtitle, extra meta and intro', () => {
 
 test('render: status words in tables render as badges', () => {
   const { html } = renderDoc(SRC);
-  assert.match(html, /am-status--ok"><span class="am-status-icon" aria-hidden="true">✓<\/span>已批准/);
+  assert.match(html, /am-status--ok"><span class="am-status-icon" aria-hidden="true">✓<\/span><span class="am-status-text">已批准<\/span><\/span>/);
   assert.match(html, /am-status--no/);
   assert.match(html, /am-table-wrap/);
 });
 
 test('render: a status word may be followed by inline HTML; only a leading word is a status', () => {
   const html = md('| a | b |\n|---|---|\n| ok shared with `page.js` | warn **slow** and *rare* |\n| no see [docs](https://x.org) | noted `x` |\n| uses ok `y` | ✓ |');
-  assert.match(html, /<td><span class="am-status am-status--ok"><span class="am-status-icon" aria-hidden="true">✓<\/span>shared with <code>page.js<\/code><\/span><\/td>/);
-  assert.match(html, /am-status--warn"><span class="am-status-icon" aria-hidden="true">!<\/span><strong>slow<\/strong> and <em>rare<\/em><\/span><\/td>/);
-  assert.match(html, /am-status--no"><span class="am-status-icon" aria-hidden="true">✗<\/span>see <a href="https:\/\/x.org">docs<\/a><\/span><\/td>/);
+  assert.match(html, /<td><span class="am-status am-status--ok"><span class="am-status-icon" aria-hidden="true">✓<\/span><span class="am-status-text">shared with <code>page.js<\/code><\/span><\/span><\/td>/);
+  assert.match(html, /am-status--warn"><span class="am-status-icon" aria-hidden="true">!<\/span><span class="am-status-text"><strong>slow<\/strong> and <em>rare<\/em><\/span><\/span><\/td>/);
+  assert.match(html, /am-status--no"><span class="am-status-icon" aria-hidden="true">✗<\/span><span class="am-status-text">see <a href="https:\/\/x.org">docs<\/a><\/span><\/span><\/td>/);
   assert.match(html, /<td>noted <code>x<\/code><\/td>/);
   assert.match(html, /<td>uses ok <code>y<\/code><\/td>/);
+  assert.match(html, /aria-hidden="true">✓<\/span><\/span><\/td>/);
   assert.equal(html.match(/am-status--/g).length, 4);
 });
 
@@ -378,6 +379,11 @@ test('render: diagram lightbox behavior — expand opens dialog, Esc, close butt
       this.el.setAttribute('class', list.join(' '));
     }
     contains(c) { return this.values().includes(c); }
+    toggle(c, force = !this.contains(c)) {
+      if (force) this.add(c);
+      else this.remove(c);
+      return force;
+    }
     values() { return (this.el.getAttribute('class') || '').trim().split(/\s+/).filter(Boolean); }
   }
 
@@ -690,6 +696,13 @@ test('render: outline: left puts the rail on the inline-start side; an invalid v
   assert.throws(() => renderDoc(RAIL('outline: middle\n')), (e) => e instanceof ParseError && /Invalid outline value "middle".*left \| right/.test(e.message));
 });
 
+test('render: file: is not shown in the page header meta line', () => {
+  const { html } = renderDoc('---\ntitle: T\nfile: my-topic\nauthor: Cyan\n---\n## A one\nText.\n');
+  const head = html.match(/<header class="am-head">[\s\S]*?<\/header>/)[0];
+  assert.match(head, /Cyan/);
+  assert.doesNotMatch(head, /my-topic/);
+});
+
 test('render: a doc page with fewer than 3 panels has no rail, and outline is not shown in the meta line', () => {
   assert.doesNotMatch(renderDoc(RAIL('outline: left\n', 2)).html, /<nav class="am-toc"/);
   assert.doesNotMatch(renderDoc(RAIL('outline: left\n')).html, /<div class="am-head-meta">/);
@@ -745,4 +758,10 @@ test('width: a preset becomes data-measure, a pixel count becomes the variable, 
   assert.match(root(draft('full')), / data-measure="full"/);
   assert.match(root(draft('1400')), / style="--am-measure: 1400px"/);
   assert.equal(/data-measure|--am-measure/.test(root(draft(''))), false, 'a page that never asks is unchanged');
+});
+
+test('render: the copy-as-image button starts hidden with labels in the page language, and print hides it', () => {
+  const { html } = renderDoc('---\nlang: zh\n---\n## A\n中文');
+  assert.match(html, /<button class="am-btn am-btn--copy-image" type="button" data-am="copy-image" data-working="正在生成图片…" data-done="已复制 ✓" data-downloaded="已下载" data-failed="复制失败" aria-label="复制为图片" title="复制为图片" hidden>复制为图片<\/button>/);
+  assert.match(html, /\.am-btn--copy-image \{ display: none !important; \}/);
 });

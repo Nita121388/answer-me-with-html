@@ -2,7 +2,7 @@ import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { Readable, Writable } from 'node:stream';
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, writeFileSync, readdirSync, rmSync, existsSync, mkdirSync } from 'node:fs';
+import { mkdtempSync, readFileSync, writeFileSync, readdirSync, rmSync, existsSync, mkdirSync, chmodSync, statSync, symlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname, basename } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -52,6 +52,53 @@ test('cli render: reads stdin, writes to AM_HOME/pages, prints the path and stat
   assert.match(r.out, /STE ✓ 0 warnings/);
 });
 
+test('cli render: pages_dir writes pages into that folder, and the config list shows the path setting', async () => {
+  const outDir = join(dir, 'notes-out');
+  assert.equal((await run(['config', 'set', 'pages_dir', outDir])).code, 0);
+  const listed = await run(['config']);
+  assert.equal(listed.code, 0, listed.err);
+  assert.match(listed.out, /pages_dir/);
+  assert.match(listed.out, /a folder path/);
+  const made = await run(['render', '-'], { stdin: GOOD });
+  assert.equal(made.code, 0, made.err);
+  const file = made.out.match(/✓ (.+\.html)/)[1];
+  assert.ok(file.startsWith(outDir), file);
+  // --replace accepts a page in pages_dir (the earlier file is removed once the new one is written).
+  const again = await run(['render', '-', '--replace', file], { stdin: GOOD });
+  assert.equal(again.code, 0, again.err);
+  assert.ok(again.out.match(/✓ (.+\.html)/)[1].startsWith(outDir));
+  assert.equal((await run(['config', 'reset', 'pages_dir'])).code, 0);
+});
+
+test('cli render: --replace in a shared pages_dir keeps a private page private', { skip: process.platform === 'win32' && 'POSIX file modes' }, async () => {
+  const outDir = join(dir, 'shared-out');
+  assert.equal((await run(['config', 'set', 'pages_dir', outDir])).code, 0);
+  const made = await run(['render', '-'], { stdin: GOOD });
+  assert.equal(made.code, 0, made.err);
+  const file = made.out.match(/✓ (.+\.html)/)[1];
+  chmodSync(file, 0o600);
+  const again = await run(['render', '-', '--replace', file], { stdin: GOOD });
+  assert.equal(again.code, 0, again.err);
+  const next = again.out.match(/✓ (.+\.html)/)[1];
+  assert.equal(statSync(next).mode & 0o777, 0o600, 'the replaced page keeps its 0600 mode');
+  assert.equal((await run(['config', 'reset', 'pages_dir'])).code, 0);
+});
+
+test('cli patch: a planted symlink at the temp path in a shared pages_dir is not followed', { skip: process.platform === 'win32' && 'POSIX symlinks' }, async () => {
+  const outDir = join(dir, 'planted-out');
+  assert.equal((await run(['config', 'set', 'pages_dir', outDir])).code, 0);
+  const made = await run(['render', '-'], { stdin: GOOD });
+  assert.equal(made.code, 0, made.err);
+  const file = made.out.match(/✓ (.+\.html)/)[1];
+  const victim = join(dir, 'victim.txt');
+  writeFileSync(victim, 'secret');
+  // The temp name a writer that is not exclusive would use: another user of a shared folder can create it first.
+  symlinkSync(victim, join(outDir, `.${basename(file)}.${process.pid}.tmp`));
+  await run(['patch', file, '--panel', 'A'], { stdin: '## A 流程\n新的内容。\n' });
+  assert.equal(readFileSync(victim, 'utf8'), 'secret', 'the file behind the symlink is untouched');
+  assert.equal((await run(['config', 'reset', 'pages_dir'])).code, 0);
+});
+
 test('cli render: the injected clock sets the default file name; the injected open runs as configured', async () => {
   const opened = [];
   const now = new Date(2026, 0, 2, 3, 4, 5).getTime();
@@ -86,6 +133,24 @@ test('cli render: default page names are ASCII and at most 24 characters from th
   assert.equal(mixed, 'answer-me-with-html-0-5');
 
   assert.equal(await render('TCP Three-Way Handshake'), 'tcp-three-way-handshake-20260102-030405.html');
+});
+
+test('cli render: file: in the front matter names the page and the saved draft, under the same ASCII rule', async () => {
+  const { home, env } = freshHome();
+  const render = async (front, args = []) => {
+    const r = await run(['render', '-', '--no-open', ...args], { stdin: `---\n${front}\n---\n## A one\nUtilize the tool.\n`, env });
+    assert.equal(r.code, 0, r.err);
+    return { page: basename(r.out.match(/^✓ (.+\.html)$/m)[1]), draft: basename(r.out.match(/^ {2}draft: (.+)$/m)?.[1] ?? '') };
+  };
+
+  const named = await render('title: 会话切换闪回首页 · 修复结果\nfile: session-flashback-fix');
+  assert.match(named.page, /^session-flashback-fix-\d{8}-\d{6}\.html$/);
+  assert.match(named.draft, /^session-flashback-fix-\d{8}-\d{6}\.md$/);
+  assert.match((await render('title: 更新评估\nfile: Update Review!')).page, /^update-review-\d{8}-\d{6}\.html$/);
+  // A file: with no ASCII letter or digit names nothing, so the title decides, as without file:.
+  assert.match((await render('title: Docker 渲染器\nfile: 渲染器')).page, /^docker-\d{8}-\d{6}\.html$/);
+  // -o still wins.
+  assert.equal((await render('title: T\nfile: ignored', ['-o', join(home, 'out.html')])).page, 'out.html');
 });
 
 test('cli render: a second default page in the same second gets -2 and keeps both', async () => {
@@ -461,6 +526,25 @@ test('cli config: close_after_reply decides whether a rendered or patched page c
   await run(['config', 'reset']);
 });
 
+test('cli config: colophon off drops the Generated by line from a rendered or patched page', async () => {
+  const on = await run(['render', '-', '-o', 'colophon-on.html'], { stdin: '## A\nx' });
+  assert.equal(on.code, 0, on.err);
+  assert.match(readFileSync(join(dir, 'colophon-on.html'), 'utf8'), /<p class="am-colophon">/);
+  // With the setting on (the default), a patch keeps the line.
+  assert.equal((await run(['patch', 'colophon-on.html', '--panel', 'A'], { stdin: '## A\nz' })).code, 0);
+  assert.match(readFileSync(join(dir, 'colophon-on.html'), 'utf8'), /<p class="am-colophon">/);
+  assert.equal((await run(['config', 'set', 'colophon', 'off'])).code, 0);
+  const off = await run(['render', '-', '-o', 'colophon-off.html'], { stdin: '## A\nx' });
+  assert.equal(off.code, 0, off.err);
+  const page = readFileSync(join(dir, 'colophon-off.html'), 'utf8');
+  assert.doesNotMatch(page, /<p class="am-colophon">|★ Star on GitHub/);
+  assert.match(page, /<meta name="generator" content="Answer me with HTML /, 'the generator meta tag stays');
+  // A patch follows the setting at the time of the patch, like close_after_reply.
+  assert.equal((await run(['patch', 'colophon-on.html', '--panel', 'A'], { stdin: '## A\ny' })).code, 0);
+  assert.doesNotMatch(readFileSync(join(dir, 'colophon-on.html'), 'utf8'), /<p class="am-colophon">/);
+  await run(['config', 'reset']);
+});
+
 test('cli config: booleans print as on/off; an unknown key or invalid value returns 2', async () => {
   await run(['config', 'set', 'open', 'off']);
   assert.equal((await run(['config', 'get', 'open'])).out.trim(), 'off');
@@ -818,6 +902,19 @@ test('cli render: a saved stdin draft name follows the same ASCII rule as a page
   const path = r.out.match(/^ {2}draft: (.+)$/m)[1];
   assert.equal(dirname(path), join(home, 'drafts'));
   assert.match(basename(path), /^page-\d{8}-\d{6}\.md$/);
+});
+
+test('cli render: a saved stdin draft takes file: only from the front matter, as the page does', async () => {
+  const { env } = freshHome();
+  const saved = async (stdin) => {
+    const r = await run(['render', '-'], { stdin, env });
+    return basename((r.out + r.err).match(/^ {2}draft: (.+)$/m)[1]);
+  };
+  const body = '## A\nUtilize the tool.\n';
+  assert.match(await saved(`---\ntitle: Body Case\n---\nfile: secret-report\n${body}`), /^body-case-\d{8}-\d{6}\.md$/, 'a file: line in the body');
+  assert.match(await saved(`---\ntitle: Blank Case\nfile:\nsubtitle: next-line\n---\n${body}`), /^blank-case-\d{8}-\d{6}\.md$/, 'an empty file:');
+  assert.match(await saved(`---\ntitle: T\nfile: my-topic # note\n---\n${body}`), /^my-topic-\d{8}-\d{6}\.md$/, 'a trailing comment');
+  assert.match(await saved(`---\ntitle: T\nnot a key line\nfile: broken-front\n---\n${body}`), /^broken-front-\d{8}-\d{6}\.md$/, 'a malformed front matter line');
 });
 
 test('cli render: a strict STE failure and a fatal parse error with a line keep the stdin draft too', async () => {

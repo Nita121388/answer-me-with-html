@@ -2,8 +2,8 @@ import { test, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-import { configPath, readConfig, setConfig, resetConfig, CONFIG_KEYS, ConfigError } from '../src/config.js';
+import { join, resolve } from 'node:path';
+import { configPath, readConfig, setConfig, resetConfig, CONFIG_KEYS, ConfigError, pagesDir } from '../src/config.js';
 import { renderDoc } from '../src/render.js';
 
 let home;
@@ -20,7 +20,7 @@ test('configPath: is AM_HOME/config.json', () => {
 
 test('readConfig: returns the defaults when the file does not exist', () => {
   assert.deepEqual(readConfig(env).values, {
-    open: true, theme: 'auto', mode: 'auto', style: '80', voice: 'auto', update_check: true, close_after_reply: false, scale: 1,
+    open: true, theme: 'auto', mode: 'auto', style: '80', voice: 'auto', update_check: true, close_after_reply: false, colophon: true, pages_dir: '', scale: 1,
     template: 'sheet', cols: 3, collapse: false, width: 'standard',
   });
 });
@@ -55,7 +55,7 @@ test('resetConfig: resets one key or all keys to the defaults', () => {
   setConfig('theme', 'shadcn', env);
   resetConfig('open', env);
   assert.deepEqual(readConfig(env).values, {
-    open: true, theme: 'shadcn', mode: 'auto', style: '80', voice: 'auto', update_check: true, close_after_reply: false, scale: 1,
+    open: true, theme: 'shadcn', mode: 'auto', style: '80', voice: 'auto', update_check: true, close_after_reply: false, colophon: true, pages_dir: '', scale: 1,
     template: 'sheet', cols: 3, collapse: false, width: 'standard',
   });
   resetConfig(undefined, env);
@@ -72,7 +72,7 @@ test('readConfig: falls back to the defaults with a warning when the file is bro
 test('readConfig: ignores unknown keys and invalid values', () => {
   writeFileSync(configPath(env), JSON.stringify({ open: 'yes-ish', theme: 'shadcn', extra: 1 }));
   assert.deepEqual(readConfig(env).values, {
-    open: true, theme: 'shadcn', mode: 'auto', style: '80', voice: 'auto', update_check: true, close_after_reply: false, scale: 1,
+    open: true, theme: 'shadcn', mode: 'auto', style: '80', voice: 'auto', update_check: true, close_after_reply: false, colophon: true, pages_dir: '', scale: 1,
     template: 'sheet', cols: 3, collapse: false, width: 'standard',
   });
 });
@@ -100,6 +100,19 @@ test('scale: an invalid stored value falls back to 1', () => {
 
 test('CONFIG_KEYS: every key has a label', () => {
   for (const [key, spec] of Object.entries(CONFIG_KEYS)) assert.ok(spec.label, key);
+});
+
+test('pages_dir: a folder path, empty by default, and a relative path is inside the data directory', () => {
+  assert.equal(CONFIG_KEYS.pages_dir.type, 'path');
+  assert.equal(CONFIG_KEYS.pages_dir.default, '');
+  assert.equal(pagesDir(env, readConfig(env)), join(home, 'pages'));
+  setConfig('pages_dir', join(home, 'notes'), env);
+  assert.equal(readConfig(env).values.pages_dir, join(home, 'notes'));
+  assert.equal(pagesDir(env, readConfig(env)), resolve(home, 'notes'));
+  setConfig('pages_dir', 'out/pages', env);
+  assert.equal(pagesDir(env, readConfig(env)), join(home, 'out', 'pages'));
+  resetConfig('pages_dir', env);
+  assert.equal(readConfig(env).values.pages_dir, '');
 });
 
 test('render: config gives the defaults, explicit draft frontmatter wins', () => {
