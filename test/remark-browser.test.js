@@ -631,3 +631,66 @@ test('remark: a served page saves a mark and its note to the server and restores
     await srv.close();
   }
 });
+
+// A fold takes the remark popups with it (src/runtime/remark.js): the popover and the word float stand on a block, the block
+// folds into a closed panel, and the note is saved — the way a click elsewhere saves it — with the popup gone. A click on the
+// fold's head closes the popover anyway (the click outside), so the fold here is made the way fold all and a print restore make
+// it: the open state changes with no click, and the toggle itself must close the popup.
+test('remark: a fold takes the popover and the word float with it, and saves the note', { skip: SKIP }, async () => {
+  const file = render('en-fold', `---
+title: Remark fold
+lang: en
+collapse: true
+---
+## A The cache
+Redis keeps sessions in memory.
+
+- Same text
+- Last item
+`);
+  await load(file);
+  assert.deepEqual(await errors(), []);
+  const result = await evaluate(`(async () => {
+    const out = {};
+    const fold = document.querySelector('#panel-A > .am-fold');
+    const para = document.querySelector('#panel-A .am-panel-body p');
+    // The popover: a click on the block opens it, the reader types a note, and the panel folds under it.
+    document.querySelector('[data-am="remark"]').click();
+    para.click();
+    const pop = document.querySelector('.am-remark-pop');
+    out.popOpen = !pop.hidden;
+    pop.querySelector('input').value = 'Check the first line.';
+    fold.open = false;
+    await new Promise((r) => setTimeout(r, 100));
+    out.popClosed = pop.hidden;
+    out.blockMarked = para.classList.contains('am-mark');
+    out.storedPop = (JSON.parse(localStorage.getItem('am-remark:' + location.pathname) || '[]')[0] || {}).note;
+    // The word float: words picked inside the list item open it, the reader types a note, and the panel folds under it too.
+    fold.open = true;
+    await new Promise((r) => setTimeout(r, 100));
+    const li = document.querySelector('#panel-A .am-panel-body li');
+    const text = [...li.childNodes].find((n) => n.nodeType === 3);
+    const range = document.createRange();
+    range.setStart(text, 0);
+    range.setEnd(text, 4);
+    const selection = getSelection();
+    selection.removeAllRanges();
+    selection.addRange(range);
+    await new Promise((r) => setTimeout(r, 200)); // the float reads the selection on a short timer
+    const float = document.querySelector('.am-annot-float');
+    out.floatOpen = !float.hidden;
+    float.querySelector('input').value = 'why this word?';
+    fold.open = false;
+    await new Promise((r) => setTimeout(r, 100));
+    out.floatClosed = float.hidden;
+    out.wordMarked = para.parentElement.querySelectorAll('mark.am-annot').length;
+    out.replyEntries = window.__amRemarkData().length;
+    selection.removeAllRanges();
+    return out;
+  })()`);
+  assert.deepEqual(result, {
+    popOpen: true, popClosed: true, blockMarked: true, storedPop: 'Check the first line.',
+    floatOpen: true, floatClosed: true, wordMarked: 1, replyEntries: 2,
+  });
+  assert.deepEqual(await errors(), []);
+});

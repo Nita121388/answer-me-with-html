@@ -152,7 +152,18 @@ if (replyBtn) {
       refreshBar();
     });
     btn.classList.toggle('am-comment-btn--on', Boolean(box.value.trim()));
-    if (box.value.trim()) show(true);
+    // The board's own fold (src/templates/panel.js): the wrap hangs on the board, outside the <details>, so the fold alone leaves
+    // the box open under the folded head. A board that starts folded ({collapsed}) starts with its box closed too, the way a fold
+    // takes an open box with it; a page that comes back into a stored fold closes it the same way, through the toggle below.
+    const fold = panel.querySelector(':scope > details.am-fold');
+    if (box.value.trim() && fold?.open !== false) show(true);
+    // A fold takes the box with it. Opening the board does not bring the box back: the reader clicks the button again, whose filled
+    // icon and accent color still say the note is there. The box is part of the board's height, so this listener registers before
+    // fold.js runs (src/runtime/compose.js): its own toggle handler then plans the sheet and holds the reader's place from heights
+    // that are already final.
+    fold?.addEventListener('toggle', () => {
+      if (!fold.open && !wrap.hidden) show(false);
+    });
     (panel.querySelector('.am-panel-head') ?? panel).append(btn);
     panel.append(wrap);
     boxes.set(id, box);

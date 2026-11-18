@@ -195,7 +195,9 @@ Selection rules:
 - The reader can pan and zoom the board, drag any panel, draw and delete edges, and shift-drag on the empty board to select
   several panels and move them together. A canvas page also exports a `.drawio` file (draw.io / diagrams.net). Panels are placed by the graph; `{x=120 y=40}` pins one to that spot.
 - `{collapse}` makes this panel a fold even when the page does not set `collapse: true`; `{collapsed}` also starts it closed.
-  A fold is a native `<details>`, so it opens and closes with no script, works from the keyboard, and prints open.
+  A fold is a native `<details>`, so it opens and closes with no script, works from the keyboard, and prints open. A fold also
+  closes the panel's open comment box and a remark popover standing on its blocks: the note is saved, and opening the panel again
+  does not bring the box back — the comment button opens it again, its filled icon still saying the note is there.
   A page with folds gets a toolbar button that folds every panel in one click, then opens every panel; the reader's choice is
   remembered like a single fold's. A `{bare}` panel has no head, so it never folds.
 - `{nest}` makes the `###` headings under this panel sub-panels, each with its own head and its own fold: a long panel then

@@ -798,6 +798,18 @@
   }, true);
   // After that handler, so a click on a note chip opens the popover instead of being closed by the same click.
   document.addEventListener('click', openChip, true);
+  // A fold takes its popups with it (src/runtime/fold.js): the block a popover or a word float stands on can fold into a closed
+  // panel, so the note is saved — the way a click elsewhere saves it — and the popup goes. A click on the fold's head closes the
+  // popover on its own (the click outside, above); this covers the float and every fold a click does not make (fold all, a print
+  // that puts the reader's layout back). The reply script registers its own fold listeners first, and this one also lands before
+  // fold.js plans the sheet, so the planned heights are final.
+  for (const fold of document.querySelectorAll('details.am-fold')) {
+    fold.addEventListener('toggle', () => {
+      if (fold.open) return;
+      if (!pop.hidden && fold.contains(anchor)) close(false);
+      if (!float.hidden && picked && fold.contains(picked.el)) commitFloat();
+    });
+  }
   // The float is placed against the words, so a scroll or a new width could leave it lying about a line it no longer covers. It
   // goes instead — with what was typed — unless the reader is typing a note: a note under the pointer is worth more than a float in
   // the right place.

@@ -65,6 +65,20 @@ collapse: true
 ${panels}`;
 })();
 
+// Every panel folds, one starts closed: the comment boxes a fold takes with it (src/runtime/reply.js) show here.
+const FOLDBOX = `---
+title: Fold box
+cols: 2
+lang: en
+collapse: true
+---
+## A First panel
+A paragraph with enough words that the panel takes a real height when the sheet plans its row.
+
+## B Second panel {collapsed}
+A panel that starts folded. Its comment button works from the folded head, and a reload keeps the box closed.
+`;
+
 let tmp;
 let chrome;
 let cdp;
@@ -113,6 +127,7 @@ before(async () => {
   render(DRAFT, 'fold');
   render(PLAIN, 'plain');
   render(LONG, 'long');
+  render(FOLDBOX, 'foldbox');
 
   chrome = spawn(CHROME, [
     '--headless=new', '--remote-debugging-port=0', `--user-data-dir=${join(tmp, 'profile')}`,
@@ -341,4 +356,57 @@ test('fold: folding every panel leaves the reader at a real place on the page', 
 test('fold: a page with no foldable panel carries no fold-all button', { skip: SKIP, timeout: 60000 }, async () => {
   await open(files.plain);
   assert.equal(await evaluate(`document.querySelector('[data-am="fold-all"]').hidden`), true);
+});
+
+// A fold takes the comment boxes of the panels it closes with it (src/runtime/reply.js): the box hangs on the board, outside the
+// <details>, so it would stay open under the folded head. Opening the board does not bring a box back: the reader clicks the
+// comment button again, whose filled icon and accent color still say the note is there.
+test('fold: an open comment box goes with its panel, and comes back only by the button', { skip: SKIP, timeout: 60000 }, async () => {
+  await open(files.foldbox);
+  // A comment on a board that starts folded ({collapsed}) opens its box under the folded head: an explicit click is the one way in.
+  await evaluate(`(() => {
+    document.querySelector('#panel-B .am-comment-btn').click();
+    const box = document.querySelector('#panel-B .am-comment textarea');
+    box.value = 'Note on a folded board.';
+    box.dispatchEvent(new Event('input'));
+  })()`);
+  assert.equal(await evaluate(`!document.querySelector('#panel-B .am-comment').hidden`), true, 'the button opens the box under the folded head');
+  // …and a page that comes back folded comes back with the box closed, the way a fold takes an open box with it.
+  await open(files.foldbox);
+  assert.deepEqual(JSON.parse(await evaluate(`JSON.stringify({
+    value: document.querySelector('#panel-B .am-comment textarea').value,
+    box: !document.querySelector('#panel-B .am-comment').hidden,
+    fold: document.querySelector('#panel-B > .am-fold').open,
+  })`)), { value: 'Note on a folded board.', box: false, fold: false });
+  // An open box under an open panel: folding the panel takes the box with it, and the button still says the note is there.
+  await evaluate(`(() => {
+    document.querySelector('#panel-A .am-comment-btn').click();
+    const box = document.querySelector('#panel-A .am-comment textarea');
+    box.value = 'Make the TTL a setting.';
+    box.dispatchEvent(new Event('input'));
+  })()`);
+  assert.equal(await evaluate(`!document.querySelector('#panel-A .am-comment').hidden`), true);
+  await evaluate(`document.querySelector('#panel-A > .am-fold > summary').click()`);
+  await new Promise((r) => setTimeout(r, LAYOUT_WAIT_MS));
+  assert.equal(await evaluate(`document.querySelector('#panel-A > .am-fold').open`), false, 'A is folded');
+  assert.equal(await evaluate(`!document.querySelector('#panel-A .am-comment').hidden`), false, 'the open box went with the fold');
+  assert.equal(await evaluate(`document.querySelector('#panel-A .am-comment-btn').classList.contains('am-comment-btn--on')`), true, 'the button still says the note is there');
+  // Opening the panel back does not bring the box: only the button does.
+  await evaluate(`document.querySelector('#panel-A > .am-fold > summary').click()`);
+  await new Promise((r) => setTimeout(r, LAYOUT_WAIT_MS));
+  assert.equal(await evaluate(`document.querySelector('#panel-A > .am-fold').open`), true, 'A is open again');
+  assert.equal(await evaluate(`!document.querySelector('#panel-A .am-comment').hidden`), false, 'the box stays closed until the button is clicked');
+  assert.equal(await evaluate(`document.querySelector('#panel-A .am-comment textarea').value`), 'Make the TTL a setting.', 'the note itself stays');
+  await evaluate(`document.querySelector('#panel-A .am-comment-btn').click()`);
+  assert.equal(await evaluate(`!document.querySelector('#panel-A .am-comment').hidden`), true, 'the button opens the box again');
+  // Fold all takes every open box with it; Open all brings the panels back and leaves the boxes closed.
+  await evaluate(`document.querySelector('[data-am="fold-all"]').click()`);
+  await new Promise((r) => setTimeout(r, LAYOUT_WAIT_MS));
+  assert.equal(await evaluate(`!document.querySelector('#panel-A .am-comment').hidden`), false, 'fold all took the box');
+  await evaluate(`document.querySelector('[data-am="fold-all"]').click()`);
+  await new Promise((r) => setTimeout(r, LAYOUT_WAIT_MS));
+  assert.equal(await evaluate(`document.querySelector('#panel-A > .am-fold').open`), true, 'open all brought the panels back');
+  assert.equal(await evaluate(`!document.querySelector('#panel-A .am-comment').hidden`), false, 'open all left the box closed');
+  // Clean up the stored choices and notes so no other test sees them.
+  await evaluate(`localStorage.removeItem('am-fold:' + location.pathname); localStorage.removeItem('am-reply:' + location.pathname); true`);
 });
