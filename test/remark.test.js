@@ -147,7 +147,11 @@ test('remark: a note is saved when its box closes for any reason but Escape', ()
   // The word float: a click on the page, a scroll or a new selection commits what was typed.
   assert.match(RUNTIME_JS, /const commitFloat = \(\) => \{/);
   assert.match(RUNTIME_JS, /window\.addEventListener\('scroll', \(\) => \{ if \(!float\.hidden && !typing\(\)\) commitFloat\(\); \}, \{ passive: true \}\);/);
-  assert.match(RUNTIME_JS, /if \(!float\.hidden && picked && noteIn\.value\.trim\(\)\) saveAnnot\(true\);/);
+  assert.match(RUNTIME_JS, /if \(!float\.hidden && picked && noteIn\.value\.trim\(\) && noteIn\.value\.trim\(\) !== \(editing\?\.note \?\? ''\)\) saveAnnot\(true\);/);
+  // A click on a mark, or the selection beating again, must not save and re-show the float: that reads as a flash.
+  assert.match(RUNTIME_JS, /if \(!float\.hidden && picked && picked\.el === next\.el && picked\.start === next\.start && picked\.end === next\.end\) return placeFloat\(rect\);/);
+  // A float whose note nobody changed closes without a repaint.
+  assert.match(RUNTIME_JS, /if \(note && note !== \(editing\?\.note \?\? ''\)\) return saveAnnot\(\);/);
   // The block popover: Enter, a click outside and a Tab away all save what the input holds.
   assert.match(RUNTIME_JS, /if \(!cancel\) commit\?\.\(\);/);
   assert.match(RUNTIME_JS, /input\.addEventListener\('blur', \(\) => \{\n      if \(!pop\.hidden\) close\(false\);\n    \}\);/);

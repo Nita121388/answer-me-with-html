@@ -470,12 +470,13 @@
   };
   // The float closes without the reader pressing Enter, so a note is saved whenever the words are left behind — a click on the
   // page, a scroll, a new selection — and Escape is the one way out that keeps the page as it was. An empty box on a mark that had
-  // a note takes the note off; a mark with nothing in it never started.
+  // a note takes the note off; a mark with nothing in it never started, and a box the reader changed nothing in just goes, so
+  // nothing is repainted behind it.
   const commitFloat = () => {
     if (float.hidden) return;
     const note = noteIn.value.trim();
-    if (note) return saveAnnot();
-    if (editing?.note) return dropAnnot();
+    if (note && note !== (editing?.note ?? '')) return saveAnnot();
+    if (editing?.note && !note) return dropAnnot();
     hideFloat();
   };
   const placeFloat = (rect) => {
@@ -507,9 +508,13 @@
     const range = selection && !selection.isCollapsed && selection.rangeCount === 1 ? selection.getRangeAt(0) : null;
     const rect = range?.getBoundingClientRect();
     const next = range && pickOf(range);
-    // The note typed on the old pick is saved before the new selection takes the float: moving on is how a reader saves without Enter.
-    if (!float.hidden && picked && noteIn.value.trim()) saveAnnot(true);
     if (!next) return commitFloat();
+    // The float already stands on these very words — a click on a mark, the selection beating again, or the timer of the pick itself.
+    // It stays as it is: saving the note and showing it again would read as a flash, and would wipe what the reader is typing.
+    if (!float.hidden && picked && picked.el === next.el && picked.start === next.start && picked.end === next.end) return placeFloat(rect);
+    // The note typed on the old pick is saved before the new selection takes the float: moving on is how a reader saves without Enter.
+    // A note nobody changed is not saved again, because the repaint behind it would flash for nothing.
+    if (!float.hidden && picked && noteIn.value.trim() && noteIn.value.trim() !== (editing?.note ?? '')) saveAnnot(true);
     picked = next;
     // The mark under the selection, if there is one: each mark of this block is asked where it sits on the page now, so a mark whose
     // text moved still matches its own words, and a selection on other words matches nothing (and starts a mark of its own). This is
