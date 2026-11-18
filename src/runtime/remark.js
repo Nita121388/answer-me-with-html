@@ -502,16 +502,19 @@
     if (!blockText(el).slice(offsets[0], offsets[1]).trim()) return null;
     return { el, start: offsets[0], end: offsets[1] };
   };
-  const showFloat = () => {
-    if (btn.getAttribute('aria-pressed') !== 'true') return hideFloat();
+  // force: a click on a mark opens the float even with the mode off, because the mark is already on the page and the reader may want
+  // its note without turning the mode on first.
+  const showFloat = (force = false) => {
     const selection = window.getSelection();
     const range = selection && !selection.isCollapsed && selection.rangeCount === 1 ? selection.getRangeAt(0) : null;
     const rect = range?.getBoundingClientRect();
     const next = range && pickOf(range);
-    if (!next) return commitFloat();
     // The float already stands on these very words — a click on a mark, the selection beating again, or the timer of the pick itself.
     // It stays as it is: saving the note and showing it again would read as a flash, and would wipe what the reader is typing.
-    if (!float.hidden && picked && picked.el === next.el && picked.start === next.start && picked.end === next.end) return placeFloat(rect);
+    if (!float.hidden && picked && next && picked.el === next.el && picked.start === next.start && picked.end === next.end) return placeFloat(rect);
+    // The mode is off: only a clicked mark opens the float, never a bare selection. Whatever was open is saved and put away.
+    if (btn.getAttribute('aria-pressed') !== 'true' && !force) return commitFloat();
+    if (!next) return commitFloat();
     // The note typed on the old pick is saved before the new selection takes the float: moving on is how a reader saves without Enter.
     // A note nobody changed is not saved again, because the repaint behind it would flash for nothing.
     if (!float.hidden && picked && noteIn.value.trim() && noteIn.value.trim() !== (editing?.note ?? '')) saveAnnot(true);
@@ -599,7 +602,8 @@
     }
   });
   // A click on marked words selects them again and opens the float on that mark, so a note can be changed or dropped without
-  // picking the words a second time. Marked words win over the block click.
+  // picking the words a second time. It works with the mode on and with it off: the mark is part of the page, and its note should
+  // not need the toolbar first. Marked words win over the block click.
   const openWords = (e) => {
     const part = e.target.closest?.('[data-am-annot]');
     if (!part) return;
@@ -613,14 +617,26 @@
     const selection = window.getSelection();
     selection?.removeAllRanges();
     selection?.addRange(range);
-    showFloat();
+    showFloat(true);
   };
-  // A pick on the words opens the float; typing a note keeps it open, and any other change of the selection reads again.
+  // With the mode off, a click on a block mark's note chip opens the popover on that block: the chip is the mark, and a reader who
+  // wants to change or drop the note should not have to find the toolbar button first.
+  const openChip = (e) => {
+    if (btn.getAttribute('aria-pressed') === 'true') return;
+    const chip = e.target.closest?.('.am-mark-note');
+    if (!chip) return;
+    const el = blockAt(chip);
+    if (el) open(el);
+  };
+  document.addEventListener('click', openWords, true);
+  // A pick on the words opens the float; typing a note keeps it open, and any other change of the selection reads again. It reads
+  // with the mode off too: there it only ever takes the float away (src/runtime/remark.js, showFloat), so a click on the page still
+  // puts a note away after a mark was opened by a click on its words.
   let readTimer = null;
   const readSelection = () => {
     if (!float.hidden && float.contains(document.activeElement)) return;
     clearTimeout(readTimer);
-    readTimer = setTimeout(showFloat, 120);
+    readTimer = setTimeout(() => showFloat(), 120);
   };
   paintAllAnnots();
 
@@ -761,17 +777,18 @@
     document.body[toggle]('mouseout', track);
     document.body[toggle]('keydown', pickKey);
     // A change of the selection reads while the mode is on: the float is the only thing that appears.
-    document[toggle]('selectionchange', readSelection);
     document[toggle]('selectionchange', markSelection);
-    document[toggle]('click', openWords, true);
     focusable(on);
     if (!on) {
       track({ type: 'mouseout', relatedTarget: null });
-      hideFloat();
+      commitFloat();
       close(false, true);
     }
   };
   btn.addEventListener('click', () => setMode(btn.getAttribute('aria-pressed') !== 'true'));
+  // The selection is watched all the time: with the mode on it opens the float on picked words, and with it off it takes a float away
+  // once the reader clicks elsewhere (showFloat saves the note and closes it when the mode is off and no mark was clicked).
+  document.addEventListener('selectionchange', readSelection);
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') close(true, true);
   });
@@ -779,6 +796,8 @@
   document.addEventListener('click', (e) => {
     if (!pop.hidden && !pop.contains(e.target)) close(false);
   }, true);
+  // After that handler, so a click on a note chip opens the popover instead of being closed by the same click.
+  document.addEventListener('click', openChip, true);
   // The float is placed against the words, so a scroll or a new width could leave it lying about a line it no longer covers. It
   // goes instead — with what was typed — unless the reader is typing a note: a note under the pointer is worth more than a float in
   // the right place.
