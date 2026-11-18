@@ -20,3 +20,7 @@ docs/demo/*.gif
 
 # Website build output (npm run site); GitHub Pages builds it in CI.
 site/dist/
+
+# 本地产物：am render 输出页与 archify 视觉稿，不入库（fork 本地工作区）
+docs/answers/
+docs/architecture.*
