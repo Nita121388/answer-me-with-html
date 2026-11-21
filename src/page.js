@@ -11,6 +11,9 @@ const AUDIO_OPEN = '<audio id="amv-audio"';
 // a left-to-right page keeps the root tag it always had.
 // voice is written only on voiced video pages (elevenlabs / local / cmd / system / audio-map); patch keeps the same voice.
 // scale is the reader's text size (src/themes/type-scale.js); 1 is the default, so the tag carries it only when it differs.
+// collapse / cols: layout the config may set. They are written only when they differ from the built-in defaults, so a page
+// that never asks keeps the tag it always had; patch reads them back so a page keeps the folds and the columns it was made
+// with, instead of re-rendering the recovered draft against a config that may have changed since.
 // measure: the reading width. 'wide' and 'full' are presets the stylesheet knows; a number is that many pixels, written as the
 // variable itself. 'standard' adds nothing, so a page that never asks keeps exactly the width it had.
 function measureAttrs(measure) {
@@ -19,8 +22,8 @@ function measureAttrs(measure) {
   return Number.isFinite(px) && px > 0 ? ` style="--am-measure: ${Math.round(px)}px"` : '';
 }
 
-export function rootTag({ lang, dir, theme, mode, style, scale = 1, voice, video = false, measure }) {
-  return `<html lang="${lang}"${dirAttr(dir)} data-theme="${esc(theme)}" data-mode="${esc(mode)}" data-style="${esc(style)}"${scale === 1 ? '' : ` data-scale="${scale}"`}${voice ? ` data-voice="${esc(voice)}"` : ''}${video ? ' data-video' : ''}${measureAttrs(measure)}>`;
+export function rootTag({ lang, dir, theme, mode, style, scale = 1, voice, video = false, measure, collapse, cols }) {
+  return `<html lang="${lang}"${dirAttr(dir)} data-theme="${esc(theme)}" data-mode="${esc(mode)}" data-style="${esc(style)}"${scale === 1 ? '' : ` data-scale="${scale}"`}${voice ? ` data-voice="${esc(voice)}"` : ''}${video ? ' data-video' : ''}${collapse ? ' data-collapse="true"' : ''}${Number.isInteger(cols) && cols !== 3 ? ` data-cols="${cols}"` : ''}${measureAttrs(measure)}>`;
 }
 
 // Copies of the root settings, written on the toolbar. A host that serves the page inside its own document leaves the real <html>
@@ -40,8 +43,10 @@ export function sourceTag(source) {
   return `${SOURCE_OPEN} hidden readonly aria-hidden="true">${esc(source)}</textarea>`;
 }
 
-// Read the envelope back: { source, video, template, theme, mode, style, scale, lang, voice, voiced }. source is null when there is no source draft.
-// scale is 1 when the tag has none (an older page) or names a value outside the range.
+// Read the envelope back: { source, video, template, theme, mode, style, scale, lang, voice, voiced, collapse, cols, measure }.
+// source is null when there is no source draft. scale is 1 when the tag has none (an older page) or names a value outside the range.
+// collapse / cols / measure are undefined when the tag has none: an older page never recorded them, so patch falls back to the
+// current config instead of pinning a guessed value.
 // The body html / markdown may contain tags with the same names, so: settings come only from the document-root <html>,
 // the source only from the final textarea, the voice only from the audio right before the source.
 export function readPage(html) {
@@ -64,12 +69,20 @@ export function readPage(html) {
     lang: attr('lang'),
     voice: attr('data-voice'),
     voiced: video && before.endsWith('</audio>') && before.lastIndexOf(AUDIO_OPEN) > before.lastIndexOf('<textarea'),
+    collapse: attr('data-collapse') == null ? undefined : attr('data-collapse') === 'true',
+    cols: readCols(attr('data-cols')),
+    measure: attr('data-measure') ?? root.match(/--am-measure:\s*(\d+(?:\.\d+)?)px/)?.[1],
   };
 }
 
 function readScale(raw) {
   const n = Number(raw);
   return Number.isFinite(n) && n >= SCALE.min && n <= SCALE.max ? n : 1;
+}
+
+function readCols(raw) {
+  const n = Number(raw);
+  return Number.isInteger(n) && n >= 1 && n <= 6 ? n : undefined;
 }
 
 export function unescapeHtml(s) {

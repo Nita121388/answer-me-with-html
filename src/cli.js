@@ -618,6 +618,13 @@ async function cmdPatch(htmlArg, fromArg, opts, ctx) {
   const config = loadConfig(ctx);
   const pages = pagesDir(ctx.env, config);
   const { theme, mode, style } = config.values;
+  // The page pins the layout it was made with (data-collapse / data-cols / data-measure on the root tag); anything an older
+  // page never recorded follows the current config — exactly what a fresh render of the recovered draft would get.
+  const layout = {
+    collapse: page.collapse ?? config.values.collapse,
+    cols: page.cols ?? config.values.cols,
+    width: page.measure ?? config.values.width,
+  };
   // Keep the original page's template, theme, mode and STE strictness (it may have been made with --theme / --style etc.); this command's arguments win.
   // Video pages must go through renderVideo, not renderDoc.
   const overrides = {
@@ -642,7 +649,7 @@ async function cmdPatch(htmlArg, fromArg, opts, ctx) {
       // Video pages also keep the original page's theme, mode and STE strictness (e.g. 3b1b / --style off); this command's arguments win.
       result = await buildVideo(patched, voice, { ...opts, theme: overrides.theme, mode: overrides.mode, style: overrides.style, previousLanguage: page.lang }, config, ctx);
     } else {
-      result = renderDoc(patched, overrides, { theme, mode, style }, { themes: ctx.themes, previousLanguage: page.lang, baseDir: cwd, codeDir: cwd, knownImages: readEmbeddedImages(html), knownCode: readEmbeddedCode(html), update: updateFor(config, ctx), closeAfter: config.values.close_after_reply, colophon: config.values.colophon, scale: page.scale });
+      result = renderDoc(patched, overrides, { theme, mode, style, ...layout }, { themes: ctx.themes, previousLanguage: page.lang, baseDir: cwd, codeDir: cwd, knownImages: readEmbeddedImages(html), knownCode: readEmbeddedCode(html), update: updateFor(config, ctx), closeAfter: config.values.close_after_reply, colophon: config.values.colophon, scale: page.scale });
     }
   } catch (e) {
     if (e instanceof TtsError) {

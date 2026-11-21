@@ -10592,8 +10592,8 @@ function measureAttrs(measure2) {
   const px = Number(measure2);
   return Number.isFinite(px) && px > 0 ? ` style="--am-measure: ${Math.round(px)}px"` : "";
 }
-function rootTag({ lang, dir, theme, mode, style, scale = 1, voice, video = false, measure: measure2 }) {
-  return `<html lang="${lang}"${dirAttr(dir)} data-theme="${esc(theme)}" data-mode="${esc(mode)}" data-style="${esc(style)}"${scale === 1 ? "" : ` data-scale="${scale}"`}${voice ? ` data-voice="${esc(voice)}"` : ""}${video ? " data-video" : ""}${measureAttrs(measure2)}>`;
+function rootTag({ lang, dir, theme, mode, style, scale = 1, voice, video = false, measure: measure2, collapse, cols }) {
+  return `<html lang="${lang}"${dirAttr(dir)} data-theme="${esc(theme)}" data-mode="${esc(mode)}" data-style="${esc(style)}"${scale === 1 ? "" : ` data-scale="${scale}"`}${voice ? ` data-voice="${esc(voice)}"` : ""}${video ? " data-video" : ""}${collapse ? ' data-collapse="true"' : ""}${Number.isInteger(cols) && cols !== 3 ? ` data-cols="${cols}"` : ""}${measureAttrs(measure2)}>`;
 }
 function rootCarrierAttrs({ lang, dir, theme, mode, style }) {
   return ` data-am-root-lang="${lang}"${dir === "rtl" ? ' data-am-root-dir="rtl"' : ""} data-am-root-theme="${esc(theme)}" data-am-root-mode="${esc(mode)}" data-am-root-style="${esc(style)}"`;
@@ -10624,12 +10624,19 @@ function readPage(html) {
     scale: readScale(attr("data-scale")),
     lang: attr("lang"),
     voice: attr("data-voice"),
-    voiced: video && before.endsWith("</audio>") && before.lastIndexOf(AUDIO_OPEN) > before.lastIndexOf("<textarea")
+    voiced: video && before.endsWith("</audio>") && before.lastIndexOf(AUDIO_OPEN) > before.lastIndexOf("<textarea"),
+    collapse: attr("data-collapse") == null ? void 0 : attr("data-collapse") === "true",
+    cols: readCols(attr("data-cols")),
+    measure: attr("data-measure") ?? root.match(/--am-measure:\s*(\d+(?:\.\d+)?)px/)?.[1]
   };
 }
 function readScale(raw) {
   const n = Number(raw);
   return Number.isFinite(n) && n >= SCALE.min && n <= SCALE.max ? n : 1;
+}
+function readCols(raw) {
+  const n = Number(raw);
+  return Number.isInteger(n) && n >= 1 && n <= 6 ? n : void 0;
 }
 function unescapeHtml(s) {
   return s.replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, "&");
@@ -11424,7 +11431,7 @@ function shell({ meta, language, body, source, embedded, update: update2, closeA
   const { ui, labelKey } = language;
   const notice = updateNotice(ui, update2, labelKey);
   const pick = (name2, label, values, current) => `<label class="am-pick">${esc(label)}<select data-am="${name2}">${values.map(([value, text2]) => `<option value="${esc(value)}"${value === current ? " selected" : ""}>${esc(text2)}</option>`).join("")}</select></label>`;
-  const root = { lang: language.htmlLang, dir: language.dir, theme: meta.theme, mode: meta.mode, style: meta.style, scale, measure: meta.width };
+  const root = { lang: language.htmlLang, dir: language.dir, theme: meta.theme, mode: meta.mode, style: meta.style, scale, measure: meta.width, collapse: meta.collapse, cols: meta.cols };
   const interactiveTable = body.includes("<table data-am-table=");
   const script = `
 ${RUNTIME_JS}${meta.template === "canvas" ? CANVAS_JS : ""}${interactiveTable ? TABLE_JS : ""}${hasDelta(body) ? DELTA_JS : ""}${update2 ? UPDATE_JS : ""}${closeAfter ? CLOSE_AFTER_JS : ""}`;
@@ -14865,6 +14872,11 @@ async function cmdPatch(htmlArg, fromArg, opts, ctx) {
   const config = loadConfig(ctx);
   const pages = pagesDir(ctx.env, config);
   const { theme, mode, style } = config.values;
+  const layout5 = {
+    collapse: page.collapse ?? config.values.collapse,
+    cols: page.cols ?? config.values.cols,
+    width: page.measure ?? config.values.width
+  };
   const overrides = {
     template: video ? void 0 : opts.template ?? page.template,
     theme: opts.theme ?? page.theme,
@@ -14884,7 +14896,7 @@ async function cmdPatch(htmlArg, fromArg, opts, ctx) {
       if (opts["audio-map"] === void 0 && !validVoice(voice, fail)) return 2;
       result = await buildVideo(patched, voice, { ...opts, theme: overrides.theme, mode: overrides.mode, style: overrides.style, previousLanguage: page.lang }, config, ctx);
     } else {
-      result = renderDoc(patched, overrides, { theme, mode, style }, { themes: ctx.themes, previousLanguage: page.lang, baseDir: cwd, codeDir: cwd, knownImages: readEmbeddedImages(html), knownCode: readEmbeddedCode(html), update: updateFor(config, ctx), closeAfter: config.values.close_after_reply, colophon: config.values.colophon, scale: page.scale });
+      result = renderDoc(patched, overrides, { theme, mode, style, ...layout5 }, { themes: ctx.themes, previousLanguage: page.lang, baseDir: cwd, codeDir: cwd, knownImages: readEmbeddedImages(html), knownCode: readEmbeddedCode(html), update: updateFor(config, ctx), closeAfter: config.values.close_after_reply, colophon: config.values.colophon, scale: page.scale });
     }
   } catch (e) {
     if (e instanceof TtsError) {

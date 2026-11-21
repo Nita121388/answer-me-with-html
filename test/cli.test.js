@@ -503,6 +503,49 @@ test('cli patch: keeps the page scale even when the config scale changed', async
   assert.match(html, /html \{ --am-scale: 1\.25; \}/);
 });
 
+test('cli patch: keeps the folds the page was made with, even after the config changes', async (t) => {
+  t.after(() => run(['config', 'reset', 'collapse']));
+  assert.equal((await run(['config', 'set', 'collapse', 'on'])).code, 0);
+  assert.equal((await run(['render', '-', '-o', 'folded.html'], { stdin: '## A\nx\n\n## B\ny\n' })).code, 0);
+  assert.match(readFileSync(join(dir, 'folded.html'), 'utf8'), /data-collapse="true"/);
+  assert.equal((await run(['config', 'set', 'collapse', 'off'])).code, 0);
+  const r = await run(['patch', 'folded.html', '--panel', 'B'], { stdin: 'z\n' });
+  assert.equal(r.code, 0, r.err);
+  const html = readFileSync(join(dir, 'folded.html'), 'utf8');
+  assert.match(html, /data-collapse="true"/);
+  assert.equal((html.match(/<details class="am-fold"/g) ?? []).length, 2);
+});
+
+test('cli patch: an older page without data-collapse follows the config', async (t) => {
+  t.after(() => run(['config', 'reset', 'collapse']));
+  assert.equal((await run(['render', '-', '-o', 'legacy-fold.html'], { stdin: '## A\nx\n\n## B\ny\n' })).code, 0);
+  // An older page never recorded the layout: strip the attribute to make one.
+  const legacy = readFileSync(join(dir, 'legacy-fold.html'), 'utf8').replace(/ data-collapse="true"/, '');
+  writeFileSync(join(dir, 'legacy-fold.html'), legacy);
+  assert.equal((await run(['config', 'set', 'collapse', 'off'])).code, 0);
+  const r = await run(['patch', 'legacy-fold.html', '--panel', 'B'], { stdin: 'z\n' });
+  assert.equal(r.code, 0, r.err);
+  assert.doesNotMatch(readFileSync(join(dir, 'legacy-fold.html'), 'utf8'), /<details class="am-fold"/);
+});
+
+test('cli patch: keeps the reading width and the sheet cols the page was made with', async (t) => {
+  t.after(() => run(['config', 'reset', 'width']));
+  t.after(() => run(['config', 'reset', 'cols']));
+  assert.equal((await run(['config', 'set', 'width', 'wide'])).code, 0);
+  assert.equal((await run(['config', 'set', 'cols', '1'])).code, 0);
+  assert.equal((await run(['render', '-', '-o', 'wide-cols.html'], { stdin: '## A\nx\n\n## B\ny\n' })).code, 0);
+  const made = readFileSync(join(dir, 'wide-cols.html'), 'utf8');
+  assert.match(made, /data-measure="wide"/);
+  assert.match(made, /data-cols="1"/);
+  assert.equal((await run(['config', 'set', 'width', 'standard'])).code, 0);
+  assert.equal((await run(['config', 'set', 'cols', '3'])).code, 0);
+  const r = await run(['patch', 'wide-cols.html', '--panel', 'B'], { stdin: 'z\n' });
+  assert.equal(r.code, 0, r.err);
+  const html = readFileSync(join(dir, 'wide-cols.html'), 'utf8');
+  assert.match(html, /data-measure="wide"/);
+  assert.match(html, /data-cols="1"/);
+});
+
 test('cli video: never takes the config scale', async (t) => {
   assert.equal((await run(['config', 'set', 'scale', '1.25'])).code, 0);
   t.after(() => run(['config', 'reset', 'scale']));

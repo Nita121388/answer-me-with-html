@@ -353,7 +353,7 @@ function shell({ meta, language, body, source, embedded, update, closeAfter, col
   const notice = updateNotice(ui, update, labelKey);
   const pick = (name, label, values, current) => `<label class="am-pick">${esc(label)}<select data-am="${name}">${values
     .map(([value, text]) => `<option value="${esc(value)}"${value === current ? ' selected' : ''}>${esc(text)}</option>`).join('')}</select></label>`;
-  const root = { lang: language.htmlLang, dir: language.dir, theme: meta.theme, mode: meta.mode, style: meta.style, scale, measure: meta.width };
+  const root = { lang: language.htmlLang, dir: language.dir, theme: meta.theme, mode: meta.mode, style: meta.style, scale, measure: meta.width, collapse: meta.collapse, cols: meta.cols };
   // The one inline script, as the browser reads it: the policy pins a hash of exactly this text.
   const interactiveTable = body.includes('<table data-am-table=');
   const script = `\n${RUNTIME_JS}${meta.template === 'canvas' ? CANVAS_JS : ''}${interactiveTable ? TABLE_JS : ''}${hasDelta(body) ? DELTA_JS : ''}${update ? UPDATE_JS : ''}${closeAfter ? CLOSE_AFTER_JS : ''}`;
