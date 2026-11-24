@@ -49,7 +49,9 @@
   // The one definition of a block a reader can mark: the content under <main>. The page and panel titles are left out, because the
   // reply reads them as text; a panel has its Comment button.
   // A $$ block on its own is a div; a $$ formula inside a sentence is a span of its paragraph.
-  const BLOCK = 'main :is(h1,h2,h3,h4,h5,h6,p,li,blockquote,pre,table,dd,dt,figure,div.am-math-block):not(.am-head *, .am-panel-head *, .am-toc *)';
+  // A foldable tree row is in it too (```tree list fold, src/components/tree.js): a leaf was already in it as an li, and the row of
+  // a node that folds is the summary the reader would ask about, so it takes its note as well.
+  const BLOCK = 'main :is(h1,h2,h3,h4,h5,h6,p,li,blockquote,pre,table,dd,dt,figure,div.am-math-block,.am-tree-fold > summary):not(.am-head *, .am-panel-head *, .am-toc *)';
   // A click on these does what it always did.
   const LIVE = '.am-remark-pop, .am-annot-float, .am-toolbar, a, button, input, textarea, select, label';
   const blockAt = (target) => (target.closest(LIVE) ? null : target.closest(BLOCK));
@@ -626,7 +628,11 @@
     const chip = e.target.closest?.('.am-mark-note');
     if (!chip) return;
     const el = blockAt(chip);
-    if (el) open(el);
+    // A tree row that folds is a <summary>: a click on its note opens the note, and does not fold it.
+    if (el) {
+      if (el.localName === 'summary') e.preventDefault();
+      open(el);
+    }
   };
   document.addEventListener('click', openWords, true);
   // A pick on the words opens the float; typing a note keeps it open, and any other change of the selection reads again. It reads
@@ -727,7 +733,11 @@
     // comes right after a selection change inside the block it lands on opens nothing: the float is the only thing that appears.
     if (dragPicked(e.target)) return;
     const el = blockAt(e.target);
-    if (el) open(el);
+    // A tree row that folds is a <summary>: in marking mode the click marks it, and does not fold it.
+    if (el) {
+      if (el.localName === 'summary') e.preventDefault();
+      open(el);
+    }
   };
   // A click that follows a drag belongs to that drag, not to the block: the reader was picking words. Two signs say so — the live
   // selection still covers words in this block, or a selection change in this block happened a moment ago (a browser may collapse
