@@ -169,7 +169,7 @@ Write a component as a fenced code block (```` ```flow ```` … ```` ``` ````); 
 | Classes, code interfaces and their relationships | `class [LR]` | declare `class User` and `interface Store`, indent `+id: string` or `+save(): void`, then `User ..> Store: uses` |
 | HTTP/RPC contracts or one requirement changing several endpoints | `api` | `GET /users/{id}` or `RPC users.UserService/GetUser`, sections `path`, `query`, `headers`, `request [Type]`, `response STATUS [Type]`, indented `id string required` or `email string optional`; multiple endpoints per block; `+` / `-` / `~` markers on endpoints, sections or fields |
 | Messages between actors over time | `sequence [num]` | `A -> B: request`, `B --> A: response`, `note A, B: note`, `== phase ==` |
-| Hierarchy / directories / taxonomy | `tree [list]` | indentation for levels, `label \| description`, `` `id` label `` |
+| Hierarchy / directories / taxonomy | `tree [list] [fold [open]]` | indentation for levels, `label \| description`, `` `id` label ``; `fold` makes every node with children click to open and close |
 | History / phases | `timeline [v]` | `time \| title \| description`, `*` highlights |
 | Values and limits | `limits` | `label \| 13 / 20 \| unit`, limit only: `label \| max 20` |
 | Numbers to compare across items (bars), over time (a line) or as shares of a whole (a pie) | `chart bar [horizontal] \| line \| pie [unit=ms]` | optional `\| p50 \| p95` line that names the series, then `label \| 12 \| 40`, `*` highlights a row; pie takes one number per row |

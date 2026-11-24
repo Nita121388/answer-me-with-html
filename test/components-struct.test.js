@@ -53,6 +53,55 @@ test('tree: error on empty content', () => {
   throwsAt(() => render('tree', '\n  \n'), 1);
 });
 
+const FOLD_TREE = `src/ | repository\n  components/ | renders the tree
+    tree.js
+    flow.js
+  runtime/`;
+
+test('tree list fold: a node with children is a closed <details>, a leaf stays <li>', () => {
+  const html = render('tree', FOLD_TREE, 'list fold');
+  assert.match(html, /<details class="am-tree-fold" data-key="components\/"[^>]*><summary><span class="am-tree-label">components\/<\/span><span class="am-tree-sub">renders the tree<\/span><\/summary>/, 'the note stays on the folding line');
+  assert.doesNotMatch(html, /<details[^>]*\bopen\b/, 'closed by default');
+  assert.match(html, /<li data-key="flow.js"[^>]*><span class="am-tree-label">flow.js<\/span><\/li>/, 'a leaf never folds');
+});
+
+test('tree fold: the tree carries the expander column class, so a triangle never sits on a connector line', () => {
+  assert.match(render('tree', FOLD_TREE, 'fold'), /<div class="am-tree am-tree--fold"/);
+  assert.doesNotMatch(render('tree', FOLD_TREE, 'list'), /am-tree--fold/, 'a tree with no fold keeps every label where it was');
+  assert.doesNotMatch(render('tree', FOLD_TREE), /am-tree--fold/, 'the org chart keeps it too');
+});
+
+test('tree fold open: every foldable node starts open', () => {
+  const html = render('tree', FOLD_TREE, 'fold open');
+  assert.equal((html.match(/<details class="am-tree-fold" open/g) || []).length, 1, 'components/ folds; runtime/ is a leaf here and the root is a box of its own');
+});
+
+test('tree fold: it implies the list, so an org-chart shape folds too', () => {
+  const orgShape = render('tree', STE_TREE, 'fold');
+  assert.doesNotMatch(orgShape, /am-tree-cols/, 'fold never draws an org chart');
+  assert.match(orgShape, /<details class="am-tree-fold/);
+});
+
+test('tree fold: the highlight and the change markers move to the <details> with it', () => {
+  const html = render('tree', 'Root\n  *Part 2 | keep\n    + added/\n      a.js', 'fold open');
+  assert.match(html, /<details class="am-tree-fold am-tree-hi" open/);
+  assert.match(html, /<details class="am-tree-fold" open[^>]*data-delta="added"/);
+});
+
+test('tree fold: a video leaves the fold out and says so, because its steps open the tree a line at a time', () => {
+  const notes = [];
+  const html = COMPONENTS.get('tree').render(FOLD_TREE, { args: 'list fold', uid: () => 'u1', video: true, warn: (w) => notes.push(w.message) });
+  assert.doesNotMatch(html, /am-tree-fold/, 'no node folds in a video');
+  assert.match(html, /am-tree-list/);
+  assert.deepEqual(notes, ['fold is left out in a video: its steps open the tree a line at a time']);
+});
+
+test('tree: no fold argument keeps the plain <li> markup', () => {
+  const html = render('tree', FOLD_TREE, 'list');
+  assert.doesNotMatch(html, /am-tree-fold/);
+  assert.match(html, /<li[^>]*><span class="am-tree-label">components\/<\/span><span class="am-tree-sub">renders the tree<\/span><ul>/);
+});
+
 // ── limits ──
 test('niceScale: the axis maximum is rounded up with headroom, at most 7 ticks', () => {
   assert.deepEqual(niceScale(20), { max: 30, step: 5 });

@@ -7,7 +7,7 @@ import { splitMarker, markState, deltaAttr, deltaBadge, withDelta } from './delt
 export default {
   name: 'tree',
   summary: 'Hierarchy tree (org chart / indented list)',
-  syntax: `\`\`\`tree [list]
+  syntax: `\`\`\`tree [list] [fold [open]]
 Root | subtitle
   Child
     Grandchild | one-line note
@@ -16,6 +16,7 @@ Root | subtitle
 - Indentation (spaces or tabs) sets the level; "label | note" adds a gray note.
 - One root with 2 to 4 children → org chart; more children or the list argument → indented list; several roots → side by side.
 - Labels support inline Markdown, such as \`Section 1\` Words.
+- \`fold\` makes every node with children foldable: the reader clicks a node to open and close it, with no script, and its note stays on the folding line. Nodes start closed; \`fold open\` starts them open. Every level folds on its own, however deep the tree goes. \`fold\` implies the indented list (an org chart computes its lines up front). Print shows every folded node open; a video leaves the fold out, because its steps already open the tree line by line.
 - Change markers show what a plan adds, removes and changes. A line can start with + (added), - (removed) or ~ (changed), followed by a space, after the indentation:
 \`\`\`tree list
 src/
@@ -29,25 +30,33 @@ src/
   - Indentation still sets the level. The children of a + or - node inherit it; a child that carries a different marker is an error. ~ marks one node and is not inherited.
   - The Changes view draws added in the theme's ok color, removed faded with a struck-through label, changed with a warn outline, and each marked node with a +, − or ~ badge. A count row and a Before / Changes / After switch sit under the tree: Before and After show the tree as it was and as it will be, plain and without the items that are not in that view.
   - A line that starts with a marker and a space is always read as a marker. To keep a label that starts with "- ", write \\- item.`,
-  example: '```tree\nASD-STE100 | Simplified Technical English\n  Part 1: Writing rules\n    `Section 1` Words\n  Part 2: Dictionary\n    Approved words | one word, one meaning\n```',
-  render(text, { args, ui, video }) {
+  example: '```tree list fold open\nsrc/\n  components/\n    tree.js\n    flow.js\n  runtime/\n    fold.js\n```',
+  render(text, { args, ui, video, warn }) {
     const roots = buildTree(text);
     if (!roots.length) throw new ComponentError('tree needs at least one node', 1);
-    return withDelta(treeHtml(roots, /\blist\b/.test(args), ui), statesOf(roots), { ui, video });
+    // fold implies the indented list: an org chart computes its boxes and lines up front, so its nodes cannot fold.
+    const asked = /\bfold\b/.test(args);
+    // A video shows the tree a line at a time as the narration plays, so every node is open there: a closed node would hold back
+    // the lines the next step is showing.
+    if (asked && video) warn?.({ message: 'fold is left out in a video: its steps open the tree a line at a time' });
+    const fold = asked && !video ? (/\bopen\b/.test(args) ? 'open' : 'closed') : null;
+    return withDelta(treeHtml(roots, /\blist\b/.test(args) || asked, ui, fold), statesOf(roots), { ui, video });
   },
 };
 
-function treeHtml(roots, listMode, ui) {
+function treeHtml(roots, listMode, ui, fold) {
+  // A folding tree takes an expander column beside every row (src/themes/base.css), so it carries the class that adds it.
+  const box = (inner) => `<div class="am-tree${fold ? ' am-tree--fold' : ''}">${inner}</div>`;
   if (roots.length === 1) {
     const [root] = roots;
     const n = root.children.length;
     if (!listMode && n >= 2 && n <= 4) return orgHtml(root, ui);
-    return `<div class="am-tree">${rootBox(root, ui, true)}${listHtml(root.children, ui)}</div>`;
+    return box(`${rootBox(root, ui, true)}${listHtml(root.children, ui, fold)}`);
   }
   if (!listMode && roots.length <= 4) {
-    return `<div class="am-tree"><div class="am-tree-cols am-tree-cols--free" style="--n: ${roots.length}">${colsHtml(roots, ui)}</div></div>`;
+    return box(`<div class="am-tree-cols am-tree-cols--free" style="--n: ${roots.length}">${colsHtml(roots, ui)}</div>`);
   }
-  return `<div class="am-tree">${listHtml(roots, ui)}</div>`;
+  return box(listHtml(roots, ui, fold));
 }
 
 const statesOf = (nodes) => nodes.flatMap((n) => [n.state, ...statesOf(n.children)]);
@@ -136,12 +145,20 @@ function orgHtml(root, ui) {
   return `<div class="am-tree">${rootBox(root, ui)}<div class="am-tree-cols" style="--n: ${root.children.length}">${colsHtml(root.children, ui)}</div></div>`;
 }
 
-function listHtml(nodes, ui) {
-  return `<ul class="am-tree-list">${nodes.map((n, i) => liHtml(n, ui, nodes, i)).join('')}</ul>`;
+function listHtml(nodes, ui, fold) {
+  return `<ul class="am-tree-list">${nodes.map((n, i) => liHtml(n, ui, nodes, i, fold)).join('')}</ul>`;
 }
 
-function liHtml(n, ui, siblings, i) {
+// A node with children becomes a native <details> when the fence asks for folding: the browser opens and closes it with no script,
+// and the summary keeps the label and the note, so a closed node still says what it holds.
+function liHtml(n, ui, siblings, i, fold) {
   const sub = n.sub ? `<span class="am-tree-sub">${mdInline(n.sub)}</span>` : '';
-  const kids = n.children.length ? `<ul>${n.children.map((c, k) => liHtml(c, ui, n.children, k)).join('')}</ul>` : '';
-  return `<li${n.hi ? ' class="am-tree-hi"' : ''}${vattrs(n)}${lineAttrs(siblings, i, false)}><span class="am-tree-label">${deltaBadge(n.state, ui)}${labelHtml(n.label)}</span>${sub}${kids}</li>`;
+  const kids = n.children.length ? `<ul>${n.children.map((c, k) => liHtml(c, ui, n.children, k, fold)).join('')}</ul>` : '';
+  const shape = `${vattrs(n)}${lineAttrs(siblings, i, false)}`;
+  const label = `${deltaBadge(n.state, ui)}${labelHtml(n.label)}`;
+  if (fold && n.children.length) {
+    const open = fold === 'open' ? ' open' : '';
+    return `<details class="am-tree-fold${n.hi ? ' am-tree-hi' : ''}"${open}${shape}><summary><span class="am-tree-label">${label}</span>${sub}</summary>${kids}</details>`;
+  }
+  return `<li${n.hi ? ' class="am-tree-hi"' : ''}${shape}><span class="am-tree-label">${label}</span>${sub}${kids}</li>`;
 }
