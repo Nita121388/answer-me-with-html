@@ -1,33 +1,33 @@
 {
-  "version": "0.6.1",
+  "version": "0.7.0",
   "en": [
-    "New diagrams: state machines, UML classes and HTTP/RPC contracts",
-    "Copy as image puts the page on the clipboard; pages_dir picks the folder",
-    "am video --voice cmd narrates with edge-tts, piper or another CLI TTS"
+    "Foldable tree nodes: `tree list fold` opens and closes any depth, with no script",
+    "Printing shows every folded node open; a video leaves the fold out",
+    "A node that folds can be marked and asked about"
   ],
   "zh": [
-    "新增图表：状态机、UML 类图和 HTTP/RPC 接口契约",
-    "「复制为图片」把整页放进剪贴板；pages_dir 指定页面输出目录",
-    "am video --voice cmd 用 edge-tts、piper 等命令行 TTS 配音"
+    "树节点可折叠：`tree list fold` 任意深度收放，无需脚本",
+    "打印时所有折叠节点展开；视频模式自动不折叠",
+    "可折叠的节点行也能标记提问"
   ],
   "zh-Hant": [
-    "新增圖表：狀態機、UML 類別圖和 HTTP/RPC 介面契約",
-    "「複製為圖片」把整頁放進剪貼簿；pages_dir 指定頁面輸出資料夾",
-    "am video --voice cmd 用 edge-tts、piper 等命令列 TTS 配音"
+    "樹節點可折疊：`tree list fold` 任意深度收放，無需腳本",
+    "列印時所有折疊節點展開；影片模式自動不折疊",
+    "可折疊的節點列也能標記提問"
   ],
   "ja": [
-    "新しい図：状態遷移図、UML クラス図、HTTP/RPC の API 仕様",
-    "「画像としてコピー」でページをクリップボードへ。出力先は pages_dir",
-    "am video --voice cmd で edge-tts や piper などのコマンド TTS が使えます"
+    "ツリーの節点を折りたためます（`tree list fold`）。深さを問わずスクリプト不要",
+    "印刷では折りたたんだ節点もすべて開きます。動画では折りたたみません",
+    "折りたためる節点の行に注記や質問ができます"
   ],
   "he": [
-    "דיאגרמות חדשות: מכונות מצבים, מחלקות UML וחוזי HTTP/RPC",
-    "העתקה כתמונה שמה את העמוד בלוח; pages_dir קובע את התיקייה",
-    "am video --voice cmd מקריא עם edge-tts, piper או TTS אחר משורת הפקודה"
+    "צמתים מתקפלים בעץ: ⁦`tree list fold`⁩ בכל עומק, בלי סקריפט",
+    "בהדפסה כל צומת מקופל נפתח; בוידאו הקיפול מושמט",
+    "אפשר לסמן ולשאול על שורה של צומת מתקפל"
   ],
   "tr": [
-    "Yeni diyagramlar: durum makineleri, UML sınıfları, HTTP/RPC sözleşmeleri",
-    "Görsel olarak kopyala sayfayı panoya alır; klasörü pages_dir seçer",
-    "am video --voice cmd; edge-tts, piper gibi komut satırı TTS ile seslendirir"
+    "Katlanır ağaç düğümleri: `tree list fold` her derinlikte betiksiz açılır",
+    "Yazdırmada katlanmış düğümler açık çıkar; videoda katlama yer almaz",
+    "Katlanan bir düğümün satırı işaretlenip sorgulanabilir"
   ]
 }
